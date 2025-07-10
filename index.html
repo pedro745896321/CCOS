@@ -682,6 +682,47 @@
             photoTakenBlob = null; // Limpa o blob da foto
         }
 
+        // Nova função para redimensionar a imagem
+        async function resizeImage(fileBlob, maxWidth = 1200, maxHeight = 1200, quality = 0.8) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    img.src = e.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        // Calculate new dimensions
+                        if (width > height) {
+                            if (width > maxWidth) {
+                                height *= maxWidth / width;
+                                width = maxWidth;
+                            }
+                        } else {
+                            if (height > maxHeight) {
+                                width *= maxHeight / height;
+                                height = maxHeight;
+                            }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob((blob) => {
+                            resolve(blob);
+                        }, 'image/jpeg', quality);
+                    };
+                };
+                reader.readAsDataURL(fileBlob);
+            });
+        }
+
         async function usePhoto() {
             if (!photoTakenBlob) {
                 alert("Nenhuma foto foi capturada.");
@@ -696,10 +737,25 @@
             ocrSpinner.style.display = 'inline-block';
             showNotification("Enviando foto para OCR...", false);
 
+            let imageToSend = photoTakenBlob;
+
+            // Verifica o tamanho do arquivo e redimensiona se for maior que 1MB
+            if (photoTakenBlob.size > 1024 * 1024) { // 1MB em bytes
+                showNotification("Redimensionando imagem para envio...", false);
+                // Redimensiona para uma largura/altura máxima de 1200px com qualidade 0.8
+                imageToSend = await resizeImage(photoTakenBlob, 1200, 1200, 0.8);
+                if (!imageToSend) {
+                    showNotification("Falha ao redimensionar a imagem.", true);
+                    extractButton.disabled = false;
+                    ocrSpinner.style.display = 'none';
+                    return;
+                }
+            }
+
             const formData = new FormData();
             formData.append("apikey", "K89510033988957");
             formData.append("language", "por");
-            formData.append("file", photoTakenBlob, "camera_photo.jpg"); // Envia o blob como arquivo
+            formData.append("file", imageToSend, "camera_photo.jpg"); // Envia o blob (redimensionado ou original)
             formData.append("OCREngine", "2");
 
             try {
@@ -775,46 +831,46 @@
         }
 
         function gerarTabela() {
-    const inputText = document.getElementById("input-lista").value;
-    const linhas = inputText.split("\n").map(l => l.trim()).filter(l => l !== "");
-    const listaFormatada = [];
-    const tabela = document.getElementById("tabela-gerada");
-    tabela.innerHTML = "";
+            const inputText = document.getElementById("input-lista").value;
+            const linhas = inputText.split("\n").map(l => l.trim()).filter(l => l !== "");
+            const listaFormatada = [];
+            const tabela = document.getElementById("tabela-gerada");
+            tabela.innerHTML = "";
 
-    const regexCPF = /\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d/g;
-    const regexEmail = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
-    const regexNome = /([A-ZÀ-Ýa-zà-ÿ'´`]+(?:\s+[A-ZÀ-Ýa-zà-ÿ'´`]+)+)/g;
+            const regexCPF = /\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d/g;
+            const regexEmail = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+            const regexNome = /([A-ZÀ-Ýa-zà-ÿ'´`]+(?:\s+[A-ZÀ-Ýa-zà-ÿ'´`]+)+)/g;
 
-    let nomeAtual = "", cpfAtual = "", emailAtual = "-";
+            let nomeAtual = "", cpfAtual = "", emailAtual = "-";
 
-    linhas.forEach(linha => {
-        const emails = linha.match(regexEmail);
-        if (emails) {
-            emailAtual = emails[0].trim();
+            linhas.forEach(linha => {
+                const emails = linha.match(regexEmail);
+                if (emails) {
+                    emailAtual = emails[0].trim();
+                }
+
+                const cpfs = linha.match(regexCPF);
+                if (cpfs) {
+                    cpfAtual = cpfs[0].replace(/\D/g, ''); // CPF somente números
+                }
+
+                const nomes = linha.match(regexNome);
+                if (nomes) {
+                    nomeAtual = capitalizarNome(nomes[0].trim());
+                }
+
+                if (nomeAtual && cpfAtual) {
+                    adicionarNaTabela(nomeAtual, cpfAtual, emailAtual);
+                    listaFormatada.push(`[NOME]: ${nomeAtual} [CPF]: ${cpfAtual}`);
+                    nomeAtual = "";
+                    cpfAtual = "";
+                    emailAtual = "-";
+                }
+            });
+
+            document.getElementById("output-lista").textContent = listaFormatada.join("\n");
+            updateNomeCount(); // Atualiza a contagem após gerar a tabela
         }
-
-        const cpfs = linha.match(regexCPF);
-        if (cpfs) {
-            cpfAtual = cpfs[0].replace(/\D/g, ''); // CPF somente números
-        }
-
-        const nomes = linha.match(regexNome);
-        if (nomes) {
-            nomeAtual = capitalizarNome(nomes[0].trim());
-        }
-
-        if (nomeAtual && cpfAtual) {
-            adicionarNaTabela(nomeAtual, cpfAtual, emailAtual);
-            listaFormatada.push(`[NOME]: ${nomeAtual} [CPF]: ${cpfAtual}`);
-            nomeAtual = "";
-            cpfAtual = "";
-            emailAtual = "-";
-        }
-    });
-
-    document.getElementById("output-lista").textContent = listaFormatada.join("\n");
-    updateNomeCount(); // Atualiza a contagem após gerar a tabela
-}
 
         function capitalizarNome(nome) {
             return nome.split(" ").map(p => {
@@ -923,7 +979,7 @@ ${nomes}`;
                 return;
             }
 
-            const arquivo = inputFile.files[0];
+            let arquivo = inputFile.files[0];
             const ocrSpinner = document.getElementById('ocr-spinner');
             const extractButton = document.querySelector('button[onclick="enviarImagemOCR()"]');
 
@@ -931,10 +987,23 @@ ${nomes}`;
             ocrSpinner.style.display = 'inline-block';
             showNotification("Enviando imagem para OCR...", false);
 
+            // Verifica o tamanho do arquivo e redimensiona se for maior que 1MB
+            if (arquivo.size > 1024 * 1024) { // 1MB em bytes
+                showNotification("Redimensionando imagem para envio...", false);
+                // Redimensiona para uma largura/altura máxima de 1200px com qualidade 0.8
+                arquivo = await resizeImage(arquivo, 1200, 1200, 0.8);
+                if (!arquivo) {
+                    showNotification("Falha ao redimensionar a imagem.", true);
+                    extractButton.disabled = false;
+                    ocrSpinner.style.display = 'none';
+                    return;
+                }
+            }
+
             const formData = new FormData();
             formData.append("apikey", "K89510033988957");
             formData.append("language", "por");
-            formData.append("file", arquivo);
+            formData.append("file", arquivo, "uploaded_image.jpg"); // Adicione o nome do arquivo com a extensão
             formData.append("OCREngine", "2");
 
             try {
