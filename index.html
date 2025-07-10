@@ -775,94 +775,46 @@
         }
 
         function gerarTabela() {
-            const inputText = document.getElementById("input-lista").value;
-            const linhas = inputText.split("\n").map(l => l.trim()).filter(l => l !== "");
-            const listaFormatada = [];
-            const tabela = document.getElementById("tabela-gerada");
-            tabela.innerHTML = "";
+    const inputText = document.getElementById("input-lista").value;
+    const linhas = inputText.split("\n").map(l => l.trim()).filter(l => l !== "");
+    const listaFormatada = [];
+    const tabela = document.getElementById("tabela-gerada");
+    tabela.innerHTML = "";
 
-            const regexCPF = /\d{3}[.\s]?\d{3}[.\s]?\d{3}[-.\s]?\d{2}/g;
-            const regexEmail = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
-            const regexNomePossivel = /[A-ZÀ-Ÿ\s'-]+(?=\s*\d{3}[.\s]?\d{3}[.\s]?\d{3}[-.\s]?\d{2})|([A-ZÀ-Ÿ][A-ZÀ-Ÿ\s'-]*[A-ZÀ-Ÿ])/g;
+    const regexCPF = /\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d[^0-9]*\d/g;
+    const regexEmail = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+    const regexNome = /([A-ZÀ-Ýa-zà-ÿ'´`]+(?:\s+[A-ZÀ-Ýa-zà-ÿ'´`]+)+)/g;
 
-            let registros = [];
-            let textoProcessado = inputText.toUpperCase();
+    let nomeAtual = "", cpfAtual = "", emailAtual = "-";
 
-            // Prioriza a busca por CPF e, se encontrado, tenta associar nome e email próximos.
-            let cpfsEncontrados = [...textoProcessado.matchAll(regexCPF)];
-
-            cpfsEncontrados.forEach(matchCPF => {
-                const cpfEncontrado = matchCPF[0].replace(/\D/g, '');
-                if (!validarCPF(cpfEncontrado)) return; // Ignora CPFs inválidos
-
-                let nomeEncontrado = "-";
-                let emailEncontrado = "-";
-
-                // Define uma janela de busca de texto ao redor do CPF
-                const startIndex = Math.max(0, matchCPF.index - 150);
-                const endIndex = Math.min(textoProcessado.length, matchCPF.index + matchCPF[0].length + 150);
-                const contextoProximo = textoProcessado.substring(startIndex, endIndex);
-
-                // Tenta encontrar o nome no contexto próximo.
-                // Prioriza nomes que parecem mais "completos" (mais de uma palavra, não só iniciais)
-                const nomesPossiveis = [...contextoProximo.matchAll(regexNomePossivel)]
-                    .map(m => m[0].trim())
-                    .filter(name => !regexCPF.test(name) && !regexEmail.test(name) && name.length > 3) // Filtra strings pequenas ou que parecem CPF/Email
-                    .sort((a, b) => b.split(' ').length - a.split(' ').length); // Prioriza nomes com mais palavras
-
-                if (nomesPossiveis.length > 0) {
-                    // Tenta pegar o nome mais "significativo" ou o primeiro que parece válido
-                    nomeEncontrado = capitalizarNome(nomesPossiveis[0]);
-                }
-
-                // Tenta encontrar e-mail no contexto próximo
-                const emailsNaLinha = contextoProximo.match(regexEmail);
-                if (emailsNaLinha && emailsNaLinha.length > 0) {
-                    emailEncontrado = emailsNaLinha[0].trim();
-                }
-
-                registros.push({
-                    nome: nomeEncontrado,
-                    cpf: cpfEncontrado,
-                    email: emailEncontrado
-                });
-            });
-
-            // Fallback: Se nenhum registro foi encontrado por CPF, tenta linhas separadas.
-            // Esta lógica é menos robusta e mais propensa a erros, mas pode ser útil para formatos muito desorganizados.
-            if (registros.length === 0) {
-                let nomeBuffer = null;
-                linhas.forEach(linha => {
-                    const cpfs = linha.match(regexCPF);
-                    const nomes = linha.match(regexNomePossivel);
-                    const emails = linha.match(regexEmail);
-
-                    if (cpfs && validarCPF(cpfs[0])) {
-                        let cpfLimpo = cpfs[0].replace(/\D/g, '');
-                        let nomeParaRegistro = nomeBuffer || "-";
-                        if (nomes && nomes.length > 0) {
-                            nomeParaRegistro = capitalizarNome(nomes[0].trim());
-                        }
-                        registros.push({
-                            nome: nomeParaRegistro,
-                            cpf: cpfLimpo,
-                            email: emails ? emails[0].trim() : "-"
-                        });
-                        nomeBuffer = null;
-                    } else if (nomes && nomes.length > 0) {
-                        nomeBuffer = capitalizarNome(nomes[0].trim());
-                    }
-                });
-            }
-
-            registros.forEach(reg => {
-                adicionarNaTabela(reg.nome, reg.cpf, reg.email);
-                listaFormatada.push(`[NOME]: ${reg.nome} [CPF]: ${reg.cpf}`);
-            });
-
-            document.getElementById("output-lista").textContent = listaFormatada.join("\n");
-            updateNomeCount();
+    linhas.forEach(linha => {
+        const emails = linha.match(regexEmail);
+        if (emails) {
+            emailAtual = emails[0].trim();
         }
+
+        const cpfs = linha.match(regexCPF);
+        if (cpfs) {
+            cpfAtual = cpfs[0].replace(/\D/g, ''); // CPF somente números
+        }
+
+        const nomes = linha.match(regexNome);
+        if (nomes) {
+            nomeAtual = capitalizarNome(nomes[0].trim());
+        }
+
+        if (nomeAtual && cpfAtual) {
+            adicionarNaTabela(nomeAtual, cpfAtual, emailAtual);
+            listaFormatada.push(`[NOME]: ${nomeAtual} [CPF]: ${cpfAtual}`);
+            nomeAtual = "";
+            cpfAtual = "";
+            emailAtual = "-";
+        }
+    });
+
+    document.getElementById("output-lista").textContent = listaFormatada.join("\n");
+    updateNomeCount(); // Atualiza a contagem após gerar a tabela
+}
 
         function capitalizarNome(nome) {
             return nome.split(" ").map(p => {
