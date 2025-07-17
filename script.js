@@ -4,17 +4,20 @@ let photoTakenBlob; // Para armazenar o blob da imagem capturada
 
 // --- FUNÇÕES DA CÂMERA ---
 function openCameraModal() {
+    console.log("Abrindo modal da câmera.");
     document.getElementById('cameraModal').style.display = 'block';
     startCamera();
 }
 
 function closeCameraModal() {
+    console.log("Fechando modal da câmera.");
     document.getElementById('cameraModal').style.display = 'none';
     stopCamera();
     resetCameraControls();
 }
 
 async function startCamera() {
+    console.log("Iniciando câmera...");
     const video = document.getElementById('camera-feed');
     const takePhotoButton = document.getElementById('take-photo-button');
     const retryPhotoButton = document.getElementById('retry-photo-button');
@@ -23,10 +26,10 @@ async function startCamera() {
     const context = photoCanvas.getContext('2d');
 
     try {
-        // Solicita acesso à câmera
-        currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); // Tenta usar a câmera traseira
+        currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         video.srcObject = currentStream;
-        video.play();
+        await video.play(); // Usar await para garantir que o vídeo comece a tocar
+        console.log("Câmera iniciada com sucesso.");
 
         takePhotoButton.style.display = 'inline-block';
         retryPhotoButton.style.display = 'none';
@@ -36,56 +39,73 @@ async function startCamera() {
 
     } catch (err) {
         console.error("Erro ao acessar a câmera: ", err);
-        alert("Não foi possível acessar a câmera. Verifique as permissões ou se há outra aplicação usando-a.");
+        alert("Não foi possível acessar a câmera. Verifique as permissões ou se há outra aplicação usando-a. Erro: " + err.name + " - " + err.message);
         closeCameraModal();
     }
 }
 
 function stopCamera() {
+    console.log("Parando câmera...");
     if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
+        console.log("Câmera parada.");
     }
 }
 
 function takePhoto() {
+    console.log("Tirando foto...");
     const video = document.getElementById('camera-feed');
     const photoCanvas = document.getElementById('photo-canvas');
     const context = photoCanvas.getContext('2d');
 
-    // Define o tamanho do canvas para o tamanho do vídeo
     photoCanvas.width = video.videoWidth;
     photoCanvas.height = video.videoHeight;
 
-    // Desenha o frame atual do vídeo no canvas
     context.drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
 
-    // Esconde o vídeo e mostra a imagem capturada no canvas
+    // --- Pré-processamento: Converter para tons de cinza ---
+    const imageData = context.getImageData(0, 0, photoCanvas.width, photoCanvas.height);
+    const pixels = imageData.data;
+    for (let i = 0; i < pixels.length; i += 4) {
+        const lightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+        pixels[i] = lightness;
+        pixels[i + 1] = lightness;
+        pixels[i + 2] = lightness;
+    }
+    context.putImageData(imageData, 0, 0);
+    console.log("Imagem convertida para tons de cinza no canvas.");
+
     video.style.display = 'none';
     photoCanvas.style.display = 'block';
 
-    // Atualiza os botões de controle
     document.getElementById('take-photo-button').style.display = 'none';
     document.getElementById('retry-photo-button').style.display = 'inline-block';
     document.getElementById('use-photo-button').style.display = 'inline-block';
 
-    // Armazena a imagem como Blob para enviar ao OCR
     photoCanvas.toBlob((blob) => {
-        photoTakenBlob = blob;
-    }, 'image/jpeg', 0.95); // Qualidade da imagem
+        if (blob) {
+            photoTakenBlob = blob;
+            console.log("Foto capturada e convertida para Blob. Tamanho:", blob.size, "bytes");
+        } else {
+            console.error("Erro: Blob da foto é nulo.");
+        }
+    }, 'image/jpeg', 0.95);
 }
 
 function retryPhoto() {
-    startCamera(); // Reinicia a câmera
+    console.log("Tentando tirar foto novamente.");
+    startCamera();
     document.getElementById('photo-canvas').style.display = 'none';
     document.getElementById('camera-feed').style.display = 'block';
     document.getElementById('take-photo-button').style.display = 'inline-block';
     document.getElementById('retry-photo-button').style.display = 'none';
     document.getElementById('use-photo-button').style.display = 'none';
-    photoTakenBlob = null; // Limpa o blob da foto
+    photoTakenBlob = null;
 }
 
-// Nova função para redimensionar a imagem
-async function resizeImage(fileBlob, maxWidth = 1200, maxHeight = 1200, quality = 0.8) {
+// Função para redimensionar e pré-processar a imagem (com tons de cinza)
+async function resizeImage(fileBlob, maxWidth = 1200, maxHeight = 1200, quality = 0.9) {
+    console.log("Iniciando redimensionamento/pré-processamento de imagem. Tamanho original:", fileBlob.size, "bytes");
     return new Promise((resolve) => {
         const img = new Image();
         const reader = new FileReader();
@@ -97,7 +117,6 @@ async function resizeImage(fileBlob, maxWidth = 1200, maxHeight = 1200, quality 
                 let width = img.width;
                 let height = img.height;
 
-                // Calculate new dimensions
                 if (width > height) {
                     if (width > maxWidth) {
                         height *= maxWidth / width;
@@ -116,8 +135,26 @@ async function resizeImage(fileBlob, maxWidth = 1200, maxHeight = 1200, quality 
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
 
+                // --- Pré-processamento: Converter para tons de cinza ---
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const pixels = imageData.data;
+                for (let i = 0; i < pixels.length; i += 4) {
+                    const lightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+                    pixels[i] = lightness;
+                    pixels[i + 1] = lightness;
+                    pixels[i + 2] = lightness;
+                }
+                ctx.putImageData(imageData, 0, 0);
+                console.log("Imagem redimensionada e convertida para tons de cinza no canvas.");
+
                 canvas.toBlob((blob) => {
-                    resolve(blob);
+                    if (blob) {
+                        console.log("Blob redimensionado gerado. Tamanho final:", blob.size, "bytes");
+                        resolve(blob);
+                    } else {
+                        console.error("Erro: Blob redimensionado é nulo.");
+                        resolve(null); // Resolve com null em caso de erro na geração do blob
+                    }
                 }, 'image/jpeg', quality);
             };
         };
@@ -126,50 +163,69 @@ async function resizeImage(fileBlob, maxWidth = 1200, maxHeight = 1200, quality 
 }
 
 async function usePhoto() {
+    console.log("Usando foto para OCR...");
     if (!photoTakenBlob) {
         alert("Nenhuma foto foi capturada.");
+        console.error("Erro: photoTakenBlob é nulo ao tentar usar a foto.");
         return;
     }
 
-    closeCameraModal(); // Fecha o modal da câmera
+    closeCameraModal();
 
     const ocrSpinner = document.getElementById('ocr-spinner');
     const extractButton = document.querySelector('button[onclick="enviarImagemOCR()"]');
     extractButton.disabled = true;
     ocrSpinner.style.display = 'inline-block';
     showNotification("Enviando foto para OCR...", false);
+    console.log("Spinner ativado e botão desativado para OCR da câmera.");
 
     let imageToSend = photoTakenBlob;
 
-    // Verifica o tamanho do arquivo e redimensiona se for maior que 1MB
     if (photoTakenBlob.size > 1024 * 1024) { // 1MB em bytes
         showNotification("Redimensionando imagem para envio...", false);
-        // Redimensiona para uma largura/altura máxima de 1200px com qualidade 0.8
-        imageToSend = await resizeImage(photoTakenBlob, 1200, 1200, 0.8);
+        console.log("Imagem da câmera > 1MB. Redimensionando...");
+        imageToSend = await resizeImage(photoTakenBlob, 1200, 1200, 0.9);
         if (!imageToSend) {
             showNotification("Falha ao redimensionar a imagem.", true);
             extractButton.disabled = false;
             ocrSpinner.style.display = 'none';
+            console.error("Erro: Falha no redimensionamento da imagem da câmera.");
             return;
         }
+        console.log("Redimensionamento da imagem da câmera concluído. Novo tamanho:", imageToSend.size, "bytes");
+    } else {
+        console.log("Imagem da câmera <= 1MB. Sem redimensionamento necessário. Tamanho:", imageToSend.size, "bytes");
     }
 
     const formData = new FormData();
-    formData.append("apikey", "K89510033988957");
+    formData.append("apikey", "K89510033988957"); // Considere obter sua própria chave API
     formData.append("language", "por");
-    formData.append("file", imageToSend, "camera_photo.jpg"); // Envia o blob (redimensionado ou original)
-    formData.append("OCREngine", "2");
+    formData.append("file", imageToSend, "camera_photo.jpg");
+    formData.append("OCREngine", "2"); // Tente OCREngine=1 se persistir o erro
+
+    console.log("FormData para OCR da câmera preparado.");
+    console.log("Verificando se o arquivo está no FormData:", formData.get('file') ? "Sim" : "Não");
+    if (formData.get('file')) {
+        console.log("Nome do arquivo no FormData:", formData.get('file').name);
+        console.log("Tipo do arquivo no FormData:", formData.get('file').type);
+        console.log("Tamanho do arquivo no FormData:", formData.get('file').size, "bytes");
+    }
+
 
     try {
+        console.log("Iniciando requisição fetch (câmera) para OCR.space...");
         const resposta = await fetch("https://api.ocr.space/parse/image", {
             method: "POST",
             body: formData,
         });
+        console.log("Resposta do fetch (câmera) recebida. Status:", resposta.status, resposta.statusText);
         const dados = await resposta.json();
+        console.log("Dados do OCR (câmera) recebidos:", dados);
 
         if (dados.IsErroredOnProcessing || !dados.ParsedResults || dados.ParsedResults.length === 0) {
             const errorMessage = dados.ErrorMessage ? dados.ErrorMessage.join(". ") : "Ocorreu um erro desconhecido no OCR.";
             showNotification("Erro ao processar a imagem: " + errorMessage, true);
+            console.error("Erro de processamento OCR (câmera):", dados);
             return;
         }
 
@@ -177,17 +233,20 @@ async function usePhoto() {
         document.getElementById("input-lista").value = textoExtraido;
         gerarTabela();
         showNotification("Texto extraído com sucesso!", false);
+        console.log("Texto OCR (câmera) extraído com sucesso:", textoExtraido);
 
     } catch (erro) {
-        console.error("Falha na requisição OCR:", erro);
+        console.error("Falha fatal na requisição OCR (câmera):", erro);
         showNotification("Falha na requisição OCR: " + erro.message, true);
     } finally {
         extractButton.disabled = false;
         ocrSpinner.style.display = 'none';
+        console.log("Finalizado processo OCR da câmera. Spinner desativado.");
     }
 }
 
 function resetCameraControls() {
+    console.log("Resetando controles da câmera.");
     document.getElementById('take-photo-button').style.display = 'inline-block';
     document.getElementById('retry-photo-button').style.display = 'none';
     document.getElementById('use-photo-button').style.display = 'none';
@@ -232,6 +291,7 @@ function validarCPF(cpf) {
 }
 
 function gerarTabela() {
+    console.log("Gerando tabela a partir do input-lista...");
     const inputText = document.getElementById("input-lista").value;
     const linhas = inputText.split("\n").map(l => l.trim()).filter(l => l !== "");
 
@@ -240,38 +300,34 @@ function gerarTabela() {
     const tabela = document.getElementById("tabela-gerada");
     tabela.innerHTML = ""; // Limpa a tabela existente
 
-    // Regex para CPF, agora mais flexível para 'O' ou '0' e diversos separadores
-    // Busca 11 caracteres que sejam 0-9 ou O/o
     const regexCPF = /[Oo0-9]{2,3}[^\w\d]*[Oo0-9]{2,3}[^\w\d]*[Oo0-9]{2,3}[^\w\d]*[Oo0-9]{2}/;
     const regexNome = /^(?:[0-9]{1,2}\s*-\s*)?([A-ZÀ-Ýa-zà-ÿ'´`]+\s+[A-ZÀ-Ýa-zà-ÿ'´`]+(?:(?:\s+|,\s*)[A-ZÀ-Ýa-zà-ÿ'´`]+)*)/;
+    const regexEmail = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
 
     let nomeEncontrado = "";
     let cpfEncontrado = "";
     let emailEncontrado = "-";
 
-    // Vamos iterar linha por linha para identificar o que é o quê
     linhas.forEach(linha => {
-        // Ignorar linhas que contêm a frase de horário
         if (linha.toUpperCase().includes("6:00 H ATE 21:00 H")) {
-            return; // Pula esta linha
+            return;
         }
 
-        // Tentar encontrar CPF na linha atual
         const cpfsMatch = linha.match(regexCPF);
         if (cpfsMatch) {
-            // Substitui 'O'/'o' por '0' e remove caracteres não numéricos
             cpfEncontrado = cpfsMatch[0].replace(/[Oo]/g, '0').replace(/\D/g, '');
         }
 
-        // Tentar encontrar nome na linha atual
         const nomesMatch = linha.match(regexNome);
         if (nomesMatch && nomesMatch[1]) {
             nomeEncontrado = capitalizarNome(nomesMatch[1].trim());
         }
 
-        // Se encontrarmos um nome E um CPF na mesma iteração, ou se é a última linha de um bloco lógico
-        // Consideraremos um "bloco" como nome seguido de cpf (e o horário que ignoramos)
-        // Se encontramos um nome e um CPF, ou se encontramos um CPF e já temos um nome, então processamos
+        const emailMatch = linha.match(regexEmail);
+        if (emailMatch) {
+            emailEncontrado = emailMatch[0];
+        }
+
         if (nomeEncontrado && cpfEncontrado) {
             adicionarNaTabela(nomeEncontrado, cpfEncontrado, emailEncontrado);
 
@@ -281,35 +337,30 @@ function gerarTabela() {
                 nomesSemCPF.push(`${nomeEncontrado} (CPF Inválido: ${cpfEncontrado})`);
             }
 
-            // Resetar para o próximo bloco
             nomeEncontrado = "";
             cpfEncontrado = "";
             emailEncontrado = "-";
         }
     });
 
-    // Adiciona quaisquer nomes que restaram sem CPF (ex: últimas linhas que só tem nome)
-    // Isso é um fallback caso o CPF não seja encontrado na linha imediatamente após o nome.
-    // É uma heurística, mas pode ajudar a capturar mais dados.
     if (nomeEncontrado && !cpfEncontrado) {
         nomesSemCPF.push(nomeEncontrado);
+        adicionarNaTabela(nomeEncontrado, 'Não Detectado', emailEncontrado);
     }
 
-
     document.getElementById("output-lista").textContent = listaFormatada.join("\n");
-    updateNomeCount(); // Atualiza a contagem após gerar a tabela
+    updateNomeCount();
 
-    // Exibe os nomes sem CPF em um alerta
     if (nomesSemCPF.length > 0) {
         alert("Os seguintes nomes não contêm CPF válido ou detectável (ou foram ignorados):\n" + nomesSemCPF.join("\n"));
     }
+    console.log("Tabela gerada. Nomes sem CPF:", nomesSemCPF);
 }
-
 
 function capitalizarNome(nome) {
     return nome.split(" ").map(p => {
         const lower = p.toLowerCase();
-        if (['da', 'de', 'do', 'dos', 'das', 'e', 'santo', 'santa'].includes(lower)) { // Adicionado 'e', 'santo', 'santa'
+        if (['da', 'de', 'do', 'dos', 'das', 'e', 'santo', 'santa'].includes(lower)) {
             return lower;
         }
         return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
@@ -319,19 +370,42 @@ function capitalizarNome(nome) {
 function adicionarNaTabela(nome, cpf, email) {
     let tabela = document.getElementById("tabela-gerada");
     const cpfValido = validarCPF(cpf);
-    // Adiciona uma classe para CPF inválido, para poder estilizá-lo com CSS
     const classeCPF = cpfValido ? "" : "cpf-invalido";
-    const titleCPF = cpfValido ? "" : "title='CPF inválido!'";
+    const titleCPF = cpfValido ? "" : "CPF inválido!";
 
-    let novaLinha = `
-        <tr>
-            <td><input type="checkbox"></td>
-            <td><button onclick="copiarTexto('${nome}')">${nome || '-'}</button></td>
-            <td class="${classeCPF}" ${titleCPF}><button onclick="copiarTexto('${cpf}')">${cpf || '-'}</button></td>
-            <td><button onclick="copiarTexto('${email}')">${email || '-'}</button></td>
-        </tr>
-    `;
-    tabela.innerHTML += novaLinha;
+    const tr = document.createElement("tr");
+
+    const tdCheckbox = document.createElement("td");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    tdCheckbox.appendChild(checkbox);
+    tr.appendChild(tdCheckbox);
+
+    const tdNome = document.createElement("td");
+    const btnNome = document.createElement("button");
+    btnNome.onclick = () => copiarTexto(nome);
+    btnNome.textContent = nome || '-';
+    tdNome.appendChild(btnNome);
+    tr.appendChild(tdNome);
+
+    const tdCPF = document.createElement("td");
+    tdCPF.classList.add(classeCPF);
+    tdCPF.setAttribute('title', titleCPF);
+    const btnCPF = document.createElement("button");
+    btnCPF.onclick = () => copiarTexto(cpf);
+    btnCPF.textContent = cpf || '-';
+    tdCPF.appendChild(btnCPF);
+    tr.appendChild(tdCPF);
+
+    const tdEmail = document.createElement("td");
+    const btnEmail = document.createElement("button");
+    btnEmail.onclick = () => copiarTexto(email);
+    btnEmail.textContent = email || '-';
+    tdEmail.appendChild(btnEmail);
+    tr.appendChild(tdEmail);
+
+    tabela.appendChild(tr);
+    console.log(`Adicionado à tabela: Nome: ${nome}, CPF: ${cpf}, Email: ${email}`);
 }
 
 function filtrarTabela() {
@@ -354,9 +428,13 @@ function copiarLista() {
 }
 
 function gerarEmail() {
+    console.log("Gerando email...");
     const horario = document.getElementById("horario").value;
-    const nomesInput = document.getElementById("nomes").value;
-    const nomes = nomesInput.split(',').map(nome => nome.trim()).join('\n');
+    const nomesSelect = document.getElementById("nomes");
+    const nomesSelecionados = Array.from(nomesSelect.options)
+                                 .filter(option => option.selected)
+                                 .map(option => option.value)
+                                 .join('\n');
 
     const emailText = `Prezados,
 
@@ -367,10 +445,11 @@ Caso a foto dos colaboradores não seja aceita, é necessário que se dirijam ao
 
 Atenciosamente,
 
-${nomes}`;
+${nomesSelecionados}`;
 
     document.getElementById("email-gerado").textContent = emailText.trim();
     showNotification("E-mail gerado!", false);
+    console.log("Email gerado.");
 }
 
 function copiarTexto(texto) {
@@ -384,6 +463,7 @@ function copiarTexto(texto) {
     try {
         document.execCommand("copy");
         showNotification("Copiado com sucesso!", false);
+        console.log("Texto copiado para a área de transferência.");
     } catch (err) {
         console.error("Erro ao copiar texto:", err);
         showNotification("Erro ao copiar texto.", true);
@@ -405,13 +485,16 @@ function showNotification(message, isError) {
     setTimeout(() => {
         notification.classList.remove("show");
     }, 3000);
+    console.log("Notificação exibida: " + message);
 }
 
 // --- INTEGRAÇÃO COM OCR.space ---
 async function enviarImagemOCR() {
+    console.log("Iniciando envio de imagem por upload para OCR...");
     const inputFile = document.getElementById("imagem-upload");
     if (inputFile.files.length === 0) {
         showNotification("Por favor, selecione uma imagem para enviar.", true);
+        console.warn("Nenhum arquivo selecionado para upload.");
         return;
     }
 
@@ -422,36 +505,52 @@ async function enviarImagemOCR() {
     extractButton.disabled = true;
     ocrSpinner.style.display = 'inline-block';
     showNotification("Enviando imagem para OCR...", false);
+    console.log("Spinner ativado e botão desativado para OCR de upload.");
 
-    // Verifica o tamanho do arquivo e redimensiona se for maior que 1MB
     if (arquivo.size > 1024 * 1024) { // 1MB em bytes
         showNotification("Redimensionando imagem para envio...", false);
-        // Redimensiona para uma largura/altura máxima de 1200px com qualidade 0.8
-        arquivo = await resizeImage(arquivo, 1200, 1200, 0.8);
+        console.log("Imagem de upload > 1MB. Redimensionando...");
+        arquivo = await resizeImage(arquivo, 1200, 1200, 0.9);
         if (!arquivo) {
             showNotification("Falha ao redimensionar a imagem.", true);
             extractButton.disabled = false;
             ocrSpinner.style.display = 'none';
+            console.error("Erro: Falha no redimensionamento da imagem de upload.");
             return;
         }
+        console.log("Redimensionamento da imagem de upload concluído. Novo tamanho:", arquivo.size, "bytes");
+    } else {
+        console.log("Imagem de upload <= 1MB. Sem redimensionamento necessário. Tamanho:", arquivo.size, "bytes");
     }
 
     const formData = new FormData();
-    formData.append("apikey", "K89510033988957");
+    formData.append("apikey", "K89510033988957"); // Considere obter sua própria chave API
     formData.append("language", "por");
-    formData.append("file", arquivo, "uploaded_image.jpg"); // Adicione o nome do arquivo com a extensão
-    formData.append("OCREngine", "2");
+    formData.append("file", arquivo, "uploaded_image.jpg");
+    formData.append("OCREngine", "2"); // Tente OCREngine=1 se persistir o erro
+
+    console.log("FormData para OCR de upload preparado.");
+    console.log("Verificando se o arquivo está no FormData:", formData.get('file') ? "Sim" : "Não");
+    if (formData.get('file')) {
+        console.log("Nome do arquivo no FormData:", formData.get('file').name);
+        console.log("Tipo do arquivo no FormData:", formData.get('file').type);
+        console.log("Tamanho do arquivo no FormData:", formData.get('file').size, "bytes");
+    }
 
     try {
+        console.log("Iniciando requisição fetch (upload) para OCR.space...");
         const resposta = await fetch("https://api.ocr.space/parse/image", {
             method: "POST",
             body: formData,
         });
+        console.log("Resposta do fetch (upload) recebida. Status:", resposta.status, resposta.statusText);
         const dados = await resposta.json();
+        console.log("Dados do OCR (upload) recebidos:", dados);
 
         if (dados.IsErroredOnProcessing || !dados.ParsedResults || dados.ParsedResults.length === 0) {
             const errorMessage = dados.ErrorMessage ? dados.ErrorMessage.join(". ") : "Ocorreu um erro desconhecido no OCR.";
             showNotification("Erro ao processar a imagem: " + errorMessage, true);
+            console.error("Erro de processamento OCR (upload):", dados);
             return;
         }
 
@@ -459,13 +558,15 @@ async function enviarImagemOCR() {
         document.getElementById("input-lista").value = textoExtraido;
         gerarTabela();
         showNotification("Texto extraído com sucesso!", false);
+        console.log("Texto OCR (upload) extraído com sucesso:", textoExtraido);
 
     } catch (erro) {
-        console.error("Falha na requisição OCR:", erro);
+        console.error("Falha fatal na requisição OCR (upload):", erro);
         showNotification("Falha na requisição OCR: " + erro.message, true);
     } finally {
         extractButton.disabled = false;
         ocrSpinner.style.display = 'none';
+        console.log("Finalizado processo OCR de upload. Spinner desativado.");
     }
 }
 
