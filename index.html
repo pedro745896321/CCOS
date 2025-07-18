@@ -21,11 +21,15 @@
             <button onclick="enviarImagemOCR()">Extrair Texto da Imagem <span id="ocr-spinner" class="spinner"></span></button>
         </div>
         
-
+        <div id="ocr-display-area" class="ocr-section">
+            <h3>Texto Extraído da Imagem:</h3>
+            <pre id="display-ocr-text" class="ocr-text-output">Nenhum texto extraído ainda.</pre>
+            <button onclick="copiarTexto(document.getElementById('display-ocr-text').textContent)">Copiar Texto Extraído</button>
+            <button onclick="transferirParaInput()">Usar no Editor Abaixo</button>
+        </div>
         <h2>2. Cole ou Edite o Texto e Gere a Tabela</h2>
         <textarea id="input-lista" placeholder="O texto da imagem aparecerá aqui ou você pode colar sua lista desorganizada..."></textarea>
         <button onclick="gerarTabela()" aria-label="Gerar tabela com os dados colados" title="Gerar Tabela">Gerar Tabela</button>
-
 
         <div class="botoes-rapidos">
             <select id="moacir-select">
