@@ -59,6 +59,16 @@ h2 {
     transition: color 0.5s;
 }
 
+/* Novo estilo para h3, incluindo o do OCR */
+h3 {
+    font-size: 26px;
+    margin-top: 25px;
+    margin-bottom: 15px;
+    color: white; /* Cor padrão */
+    transition: color 0.5s;
+}
+
+
 textarea {
     width: 90%;
     height: 300px;
@@ -138,7 +148,7 @@ td {
     transition: border-color 0.5s, color 0.5s;
 }
 
-/* Estilo para CPF inválido */
+/* Estilos para CPF inválido */
 td.cpf-invalido {
     background-color: red;
     color: white;
@@ -192,7 +202,7 @@ input[type="text"] {
 body.dark-mode {
     background-color: #222;
     color: #eee;
-    background-image: url('https://s1.1zoom.me/b3742/769/Cats_Black_Black_511583_1920x1080.jpg');
+    /* Removida a redefinição de background-image, já que a opacidade é usada para escurecer */
     background-repeat: no-repeat;
     background-position: center center;
     background-size: cover;
@@ -215,6 +225,10 @@ body.dark-mode .close:focus {
 }
 
 body.dark-mode h2 {
+    color: #eee;
+}
+
+body.dark-mode h3 { /* Estilo para h3 no modo noturno */
     color: #eee;
 }
 
@@ -253,7 +267,7 @@ body.dark-mode td {
     color: #eee;
 }
 
-/* Estilo para CPF inválido no modo noturno */
+/* Estilos para CPF inválido no modo noturno */
 body.dark-mode td.cpf-invalido {
     background-color: darkred; /* Cor um pouco mais escura para combinar */
     color: white;
@@ -341,6 +355,48 @@ body.dark-mode .notification {
     display: none; /* Oculta o canvas inicialmente */
 }
 
+/* --- NOVOS ESTILOS PARA A ÁREA DE EXIBIÇÃO DO OCR --- */
+.ocr-section {
+    background-color: rgba(0, 0, 0, 0.7); /* Fundo semi-transparente */
+    padding: 20px;
+    border-radius: 10px;
+    margin-top: 25px; /* Espaço do elemento acima */
+    margin-bottom: 25px; /* Espaço do elemento abaixo */
+    text-align: left; /* Alinha o texto à esquerda */
+    transition: background-color 0.5s;
+}
+
+.ocr-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: gold; /* Destaque para o título */
+}
+
+.ocr-text-output {
+    background-color: #222; /* Fundo escuro para o texto */
+    color: #aaffaa; /* Texto verde claro para legibilidade */
+    padding: 15px;
+    border-radius: 8px;
+    font-family: 'Courier New', Courier, monospace; /* Fonte monoespaçada */
+    white-space: pre-wrap; /* Mantém a formatação do texto (quebras de linha, espaços) */
+    word-wrap: break-word; /* Quebra palavras longas se necessário */
+    min-height: 80px; /* Altura mínima */
+    overflow-y: auto; /* Adiciona scroll se o texto for muito longo */
+    border: 1px solid #555;
+    margin-bottom: 15px;
+}
+
+body.dark-mode .ocr-section {
+    background-color: rgba(0, 0, 0, 0.85); /* Fundo mais escuro no modo noturno */
+}
+
+body.dark-mode .ocr-text-output {
+    background-color: #333;
+    color: #90ee90; /* Um verde um pouco diferente no modo noturno */
+    border-color: #777;
+}
+
+
 /* RESPONSIVIDADE PARA CELULARES E TABLETS */
 @media (max-width: 768px) {
     body {
@@ -354,6 +410,12 @@ body.dark-mode .notification {
 
     h2 {
         font-size: 22px;
+        margin-bottom: 10px;
+    }
+
+    h3 { /* Responsividade para h3 */
+        font-size: 20px;
+        margin-top: 15px;
         margin-bottom: 10px;
     }
 
@@ -433,6 +495,18 @@ body.dark-mode .notification {
         font-size: 20px;
         width: 36px;
         height: 36px;
+    }
+
+    /* Responsividade para a área de OCR */
+    .ocr-section {
+        padding: 15px;
+        margin-top: 15px;
+        margin-bottom: 15px;
+    }
+    .ocr-text-output {
+        min-height: 60px; /* Altura mínima responsiva */
+        font-size: 14px;
+        padding: 10px;
     }
 }
 
