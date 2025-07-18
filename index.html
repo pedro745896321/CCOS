@@ -20,8 +20,7 @@
             <input type="file" id="imagem-upload" accept="image/*" title="Selecione uma imagem para extrair o texto.">
             <button onclick="enviarImagemOCR()">Extrair Texto da Imagem <span id="ocr-spinner" class="spinner"></span></button>
         </div>
-        
-        <div id="ocr-display-area" class="ocr-section">
+         <div id="ocr-display-area" class="ocr-section">
             <h3>Texto Extraído da Imagem:</h3>
             <pre id="display-ocr-text" class="ocr-text-output">Nenhum texto extraído ainda.</pre>
             <button onclick="copiarTexto(document.getElementById('display-ocr-text').textContent)">Copiar Texto Extraído</button>
