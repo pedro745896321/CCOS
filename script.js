@@ -1,526 +1,546 @@
-body {
-    font-family: Arial, sans-serif;
-    background-image: url('https://s1.1zoom.me/b3742/769/Cats_Black_Black_511583_1920x1080.jpg');
-    background-repeat: no-repeat;
-    background-position: center center;
-    background-size: cover;
-    background-attachment: fixed;
-    color: white;
-    text-align: center;
-    padding: 50px;
-    transition: background-color 0.5s, color 0.5s;
+// Variáveis globais para a câmera
+let currentStream;
+let photoTakenBlob; // Para armazenar o blob da imagem capturada
+
+// --- FUNÇÕES DA CÂMERA ---
+function openCameraModal() {
+    document.getElementById('cameraModal').style.display = 'block';
+    startCamera();
 }
 
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0, 0, 0, 0.8);
-    padding-top: 60px;
+function closeCameraModal() {
+    document.getElementById('cameraModal').style.display = 'none';
+    stopCamera();
+    resetCameraControls();
 }
 
-.modal-content {
-    background-color: #fefefe;
-    margin: 5% auto;
-    padding: 20px;
-    border: 1px solid #888;
-    width: 80%;
-    color: black;
-    transition: background-color 0.5s, color 0.5s;
-    position: relative; /* Para posicionar o botão de fechar */
-}
+async function startCamera() {
+    const video = document.getElementById('camera-feed');
+    const takePhotoButton = document.getElementById('take-photo-button');
+    const retryPhotoButton = document.getElementById('retry-photo-button');
+    const usePhotoButton = document.getElementById('use-photo-button');
+    const photoCanvas = document.getElementById('photo-canvas');
+    const context = photoCanvas.getContext('2d');
 
-.close {
-    position: absolute;
-    top: 10px;
-    right: 25px;
-    color: #aaa;
-    font-size: 35px;
-    font-weight: bold;
-    cursor: pointer;
-}
+    try {
+        // Solicita acesso à câmera
+        currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); // Tenta usar a câmera traseira
+        video.srcObject = currentStream;
+        video.play();
 
-.close:hover,
-.close:focus {
-    color: black;
-    text-decoration: none;
-    cursor: pointer;
-}
+        takePhotoButton.style.display = 'inline-block';
+        retryPhotoButton.style.display = 'none';
+        usePhotoButton.style.display = 'none';
+        video.style.display = 'block';
+        photoCanvas.style.display = 'none';
 
-h2 {
-    font-size: 32px;
-    margin-bottom: 20px;
-    color: white;
-    transition: color 0.5s;
-}
-
-/* Novo estilo para h3, incluindo o do OCR */
-h3 {
-    font-size: 26px;
-    margin-top: 25px;
-    margin-bottom: 15px;
-    color: white; /* Cor padrão */
-    transition: color 0.5s;
-}
-
-
-textarea {
-    width: 90%;
-    height: 300px;
-    font-size: 20px;
-    padding: 15px;
-    border-radius: 10px;
-    margin-top: 10px;
-    background-color: white;
-    color: black;
-    border: 1px solid #ccc;
-    transition: background-color 0.5s, color 0.5s, border-color 0.5s;
-}
-
-button,
-select,
-input[type="file"] {
-    padding: 15px 30px;
-    font-size: 20px;
-    margin: 15px;
-    border-radius: 10px;
-    cursor: pointer;
-    border: none;
-    transition: background-color 0.5s, color 0.5;
-}
-
-input[type="file"] {
-    color: black;
-    background-color: #f0f0f0;
-}
-
-button {
-    background: gold;
-    color: black;
-    font-weight: bold;
-}
-
-button:hover {
-    background: #9e943e;
-}
-
-.notification {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: #4CAF50;
-    color: white;
-    padding: 10px 20px;
-    border-radius: 5px;
-    z-index: 1001;
-    opacity: 0;
-    transition: opacity 0.5s ease-in-out;
-    pointer-events: none;
-}
-
-.notification.show {
-    opacity: 1;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 5px;
-    background: white;
-    color: black;
-    border-radius: 10px;
-    overflow: hidden;
-    transition: background-color 0.5s, color 0.5s;
-}
-
-th,
-td {
-    border: 2px solid black;
-    padding: 20px;
-    text-align: center;
-    font-size: 22px;
-    transition: border-color 0.5s, color 0.5s;
-}
-
-/* Estilos para CPF inválido */
-td.cpf-invalido {
-    background-color: red;
-    color: white;
-}
-
-input[type="checkbox"] {
-    width: 30px;
-    height: 30px;
-    transform: scale(1.5);
-    margin: 10px;
-    cursor: pointer;
-}
-
-.logo {
-    width: 600px;
-    height: auto;
-    margin-bottom: 20px;
-}
-
-.email-rapido {
-    margin-top: 30px;
-    padding: 20px;
-    background: rgba(0, 0, 0, 0.7);
-    border-radius: 10px;
-    color: white;
-    transition: background-color 0.5s, color 0.5s;
-}
-
-input[type="text"] {
-    padding: 10px;
-    margin: 10px 0;
-    width: calc(100% - 22px);
-    border: none;
-    border-radius: 5px;
-    background-color: white;
-    color: black;
-    transition: background-color 0.5s, color 0.5s;
-}
-
-.riscado {
-    text-decoration: line-through;
-    opacity: 0.6;
-}
-
-.desativado {
-    pointer-events: none;
-    opacity: 0.5;
-}
-
-/* --- Modo Noturno --- */
-body.dark-mode {
-    background-color: #222;
-    color: #eee;
-    /* Removida a redefinição de background-image, já que a opacidade é usada para escurecer */
-    background-repeat: no-repeat;
-    background-position: center center;
-    background-size: cover;
-    background-attachment: fixed;
-}
-
-body.dark-mode::before {
-    opacity: 0.08;
-}
-
-body.dark-mode .modal-content {
-    background-color: #333;
-    color: #eee;
-    border-color: #555;
-}
-
-body.dark-mode .close:hover,
-body.dark-mode .close:focus {
-    color: #eee;
-}
-
-body.dark-mode h2 {
-    color: #eee;
-}
-
-body.dark-mode h3 { /* Estilo para h3 no modo noturno */
-    color: #eee;
-}
-
-body.dark-mode textarea {
-    background-color: #444;
-    color: #eee;
-    border-color: #666;
-}
-
-body.dark-mode button,
-body.dark-mode select,
-body.dark-mode input[type="file"] {
-    background-color: #333b4f;
-    color: #eee;
-    border: 1px solid #777;
-}
-
-body.dark-mode button:hover {
-    background: #666;
-}
-
-body.dark-mode input[type="file"] {
-    background-color: #555;
-    color: #eee;
-}
-
-body.dark-mode table {
-    background: #333;
-    color: #eee;
-    border: 2px solid #555;
-}
-
-body.dark-mode th,
-body.dark-mode td {
-    border: 2px solid #555;
-    color: #eee;
-}
-
-/* Estilos para CPF inválido no modo noturno */
-body.dark-mode td.cpf-invalido {
-    background-color: darkred; /* Cor um pouco mais escura para combinar */
-    color: white;
-}
-
-body.dark-mode .email-rapido {
-    background: rgba(0, 0, 0, 0.9);
-    color: #eee;
-}
-
-body.dark-mode input[type="text"] {
-    background-color: #444;
-    color: #eee;
-}
-
-body.dark-mode .notification {
-    background-color: #3a3a3a;
-    color: #fff;
-}
-
-/* Botão de Toggle do Modo Noturno */
-#dark-mode-toggle {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background-color: #333;
-    color: white;
-    border: none;
-    padding: 0;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 24px;
-    z-index: 1000;
-    transition: background-color 0.3s, color 0.3s;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-#dark-mode-toggle:hover {
-    background-color: #333b4f;
-}
-
-/* Loading Spinner */
-.spinner {
-    border: 4px solid rgba(0, 0, 0, 0.1);
-    border-left-color: #fdd835; /* Cor do spinner */
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    animation: spin 1s linear infinite;
-    display: inline-block;
-    vertical-align: middle;
-    margin-left: 10px;
-    display: none; /* Inicia escondido */
-}
-
-@keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
+    } catch (err) {
+        console.error("Erro ao acessar a câmera: ", err);
+        alert("Não foi possível acessar a câmera. Verifique as permissões ou se há outra aplicação usando-a.");
+        closeCameraModal();
     }
 }
 
-/* Estilos para a área da câmera */
-#camera-feed {
-    width: 100%;
-    max-width: 640px;
-    height: auto;
-    border: 1px solid #ccc;
-    margin-top: 10px;
-    background-color: black;
-}
-
-#camera-controls {
-    margin-top: 10px;
-}
-
-#photo-canvas {
-    display: none; /* Oculta o canvas inicialmente */
-}
-
-/* --- NOVOS ESTILOS PARA A ÁREA DE EXIBIÇÃO DO OCR --- */
-.ocr-section {
-    background-color: rgba(0, 0, 0, 0.7); /* Fundo semi-transparente */
-    padding: 20px;
-    border-radius: 10px;
-    margin-top: 25px; /* Espaço do elemento acima */
-    margin-bottom: 25px; /* Espaço do elemento abaixo */
-    text-align: left; /* Alinha o texto à esquerda */
-    transition: background-color 0.5s;
-}
-
-.ocr-section h3 {
-    margin-top: 0;
-    margin-bottom: 15px;
-    color: gold; /* Destaque para o título */
-}
-
-.ocr-text-output {
-    background-color: #222; /* Fundo escuro para o texto */
-    color: #aaffaa; /* Texto verde claro para legibilidade */
-    padding: 15px;
-    border-radius: 8px;
-    font-family: 'Courier New', Courier, monospace; /* Fonte monoespaçada */
-    white-space: pre-wrap; /* Mantém a formatação do texto (quebras de linha, espaços) */
-    word-wrap: break-word; /* Quebra palavras longas se necessário */
-    min-height: 80px; /* Altura mínima */
-    overflow-y: auto; /* Adiciona scroll se o texto for muito longo */
-    border: 1px solid #555;
-    margin-bottom: 15px;
-}
-
-body.dark-mode .ocr-section {
-    background-color: rgba(0, 0, 0, 0.85); /* Fundo mais escuro no modo noturno */
-}
-
-body.dark-mode .ocr-text-output {
-    background-color: #333;
-    color: #90ee90; /* Um verde um pouco diferente no modo noturno */
-    border-color: #777;
-}
-
-
-/* RESPONSIVIDADE PARA CELULARES E TABLETS */
-@media (max-width: 768px) {
-    body {
-        padding: 10px;
-    }
-
-    .logo {
-        width: 90%;
-        max-width: 250px;
-    }
-
-    h2 {
-        font-size: 22px;
-        margin-bottom: 10px;
-    }
-
-    h3 { /* Responsividade para h3 */
-        font-size: 20px;
-        margin-top: 15px;
-        margin-bottom: 10px;
-    }
-
-    textarea {
-        width: 100%;
-        height: 180px;
-        font-size: 16px;
-        padding: 10px;
-    }
-
-    button,
-    select,
-    input[type="file"] {
-        width: 100%;
-        padding: 10px;
-        font-size: 16px;
-        margin: 8px 0;
-    }
-
-    input[type="text"] {
-        width: 100% !important;
-        font-size: 16px;
-        padding: 10px;
-    }
-
-    table,
-    th,
-    td {
-        font-size: 14px;
-        padding: 8px;
-        word-break: break-word;
-    }
-
-    input[type="checkbox"] {
-        transform: scale(1.2);
-        margin: 5px;
-    }
-
-    .info-button {
-        top: 10px;
-        right: 10px;
-        padding: 6px 12px;
-        font-size: 12px;
-    }
-
-    .email-rapido {
-        padding: 10px;
-    }
-
-    .botoes-rapidos {
-        flex-direction: column;
-        gap: 6px;
-    }
-
-    .botoes-rapidos select,
-    .botoes-rapidos button {
-        width: 100%;
-        font-size: 14px;
-        padding: 8px;
-    }
-
-    pre#output-lista,
-    pre#email-gerado {
-        font-size: 13px;
-        white-space: pre-wrap;
-    }
-
-    .modal-content {
-        width: 95%;
-        font-size: 14px;
-    }
-
-    #dark-mode-toggle {
-        top: 10px;
-        right: 10px;
-        padding: 6px;
-        font-size: 20px;
-        width: 36px;
-        height: 36px;
-    }
-
-    /* Responsividade para a área de OCR */
-    .ocr-section {
-        padding: 15px;
-        margin-top: 15px;
-        margin-bottom: 15px;
-    }
-    .ocr-text-output {
-        min-height: 60px; /* Altura mínima responsiva */
-        font-size: 14px;
-        padding: 10px;
+function stopCamera() {
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
     }
 }
 
-@keyframes bounce {
-    0%,
-    100% {
-        transform: translateY(0);
+function takePhoto() {
+    const video = document.getElementById('camera-feed');
+    const photoCanvas = document.getElementById('photo-canvas');
+    const context = photoCanvas.getContext('2d');
+
+    // Define o tamanho do canvas para o tamanho do vídeo
+    photoCanvas.width = video.videoWidth;
+    photoCanvas.height = video.videoHeight;
+
+    // Desenha o frame atual do vídeo no canvas
+    context.drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
+
+    // Esconde o vídeo e mostra a imagem capturada no canvas
+    video.style.display = 'none';
+    photoCanvas.style.display = 'block';
+
+    // Atualiza os botões de controle
+    document.getElementById('take-photo-button').style.display = 'none';
+    document.getElementById('retry-photo-button').style.display = 'inline-block';
+    document.getElementById('use-photo-button').style.display = 'inline-block';
+
+    // Armazena a imagem como Blob para enviar ao OCR
+    photoCanvas.toBlob((blob) => {
+        photoTakenBlob = blob;
+    }, 'image/jpeg', 0.95); // Qualidade da imagem
+}
+
+function retryPhoto() {
+    startCamera(); // Reinicia a câmera
+    document.getElementById('photo-canvas').style.display = 'none';
+    document.getElementById('camera-feed').style.display = 'block';
+    document.getElementById('take-photo-button').style.display = 'inline-block';
+    document.getElementById('retry-photo-button').style.display = 'none';
+    document.getElementById('use-photo-button').style.display = 'none';
+    photoTakenBlob = null; // Limpa o blob da foto
+}
+
+// Nova função para redimensionar a imagem
+async function resizeImage(fileBlob, maxWidth = 1200, maxHeight = 1200, quality = 0.8) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            img.src = e.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Calculate new dimensions
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width *= maxHeight / height;
+                        height = maxHeight;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob((blob) => {
+                    resolve(blob);
+                }, 'image/jpeg', quality);
+            };
+        };
+        reader.readAsDataURL(fileBlob);
+    });
+}
+
+async function usePhoto() {
+    if (!photoTakenBlob) {
+        alert("Nenhuma foto foi capturada.");
+        return;
     }
 
-    50% {
-        transform: translateY(-15px);
+    closeCameraModal(); // Fecha o modal da câmera
+
+    const ocrSpinner = document.getElementById('ocr-spinner');
+    const extractButton = document.querySelector('button[onclick="enviarImagemOCR()"]');
+    extractButton.disabled = true;
+    ocrSpinner.style.display = 'inline-block';
+    showNotification("Enviando foto para OCR...", false);
+
+    let imageToSend = photoTakenBlob;
+
+    // Verifica o tamanho do arquivo e redimensiona se for maior que 1MB
+    if (photoTakenBlob.size > 1024 * 1024) { // 1MB em bytes
+        showNotification("Redimensionando imagem para envio...", false);
+        // Redimensiona para uma largura/altura máxima de 1200px com qualidade 0.8
+        imageToSend = await resizeImage(photoTakenBlob, 1200, 1200, 0.8);
+        if (!imageToSend) {
+            showNotification("Falha ao redimensionar a imagem.", true);
+            extractButton.disabled = false;
+            ocrSpinner.style.display = 'none';
+            return;
+        }
+    }
+
+    const formData = new FormData();
+    formData.append("apikey", "K89510033988957");
+    formData.append("language", "por");
+    formData.append("file", imageToSend, "camera_photo.jpg"); // Envia o blob (redimensionado ou original)
+    formData.append("OCREngine", "2");
+
+    try {
+        const resposta = await fetch("https://api.ocr.space/parse/image", {
+            method: "POST",
+            body: formData,
+        });
+        const dados = await resposta.json();
+
+        if (dados.IsErroredOnProcessing || !dados.ParsedResults || dados.ParsedResults.length === 0) {
+            const errorMessage = dados.ErrorMessage ? dados.ErrorMessage.join(". ") : "Ocorreu um erro desconhecido no OCR.";
+            showNotification("Erro ao processar a imagem: " + errorMessage, true);
+            return;
+        }
+
+        const textoExtraido = dados.ParsedResults[0].ParsedText;
+        // APENAS EXIBE NO NOVO LOCAL, NÃO PREENCHE MAIS O TEXTAREA DIRETAMENTE AQUI
+        document.getElementById("display-ocr-text").textContent = textoExtraido; 
+        document.getElementById("ocr-display-area").style.display = 'block'; // Mostra a área de exibição
+        showNotification("Texto extraído com sucesso!", false);
+
+    } catch (erro) {
+        console.error("Falha na requisição OCR:", erro);
+        showNotification("Falha na requisição OCR: " + erro.message, true);
+    } finally {
+        extractButton.disabled = false;
+        ocrSpinner.style.display = 'none';
     }
 }
 
-.pular {
-    animation: bounce 0.5s ease;
+function resetCameraControls() {
+    document.getElementById('take-photo-button').style.display = 'inline-block';
+    document.getElementById('retry-photo-button').style.display = 'none';
+    document.getElementById('use-photo-button').style.display = 'none';
+    document.getElementById('camera-feed').style.display = 'block';
+    document.getElementById('photo-canvas').style.display = 'none';
+    photoTakenBlob = null;
 }
+
+document.getElementById('take-photo-button').addEventListener('click', takePhoto);
+document.getElementById('retry-photo-button').addEventListener('click', retryPhoto);
+document.getElementById('use-photo-button').addEventListener('click', usePhoto);
+
+// NOVA FUNÇÃO: Transferir texto do OCR para o textarea de input
+function transferirParaInput() {
+    const textoOCR = document.getElementById("display-ocr-text").textContent;
+    if (textoOCR && textoOCR !== "Nenhum texto extraído ainda.") {
+        document.getElementById("input-lista").value = textoOCR;
+        gerarTabela(); // Já chama a função para gerar a tabela automaticamente
+        showNotification("Texto transferido para o editor!", false);
+    } else {
+        showNotification("Não há texto extraído para transferir.", true);
+    }
+}
+
+
+// --- FUNÇÕES DE LÓGICA E MANIPULAÇÃO DA TABELA (Originais mantidas e aprimoradas) ---
+
+function updateNomeCount() {
+    const totalNomes = document.querySelectorAll("#tabela-gerada tr").length;
+    const nomesConcluidos = document.querySelectorAll("#tabela-gerada input[type='checkbox']:checked").length;
+    const nomesRestantes = totalNomes - nomesConcluidos;
+    document.getElementById("contador-nomes").textContent = nomesRestantes;
+}
+
+function validarCPF(cpf) {
+    cpf = cpf.replace(/\D/g, ''); // Garante que só há números aqui
+
+    if (cpf.length !== 11) return false;
+    if (/^(\d)\1{10}$/.test(cpf)) return false;
+
+    const calcDigito = (base, peso) => {
+        let soma = 0;
+        for (let i = 0; i < base.length; i++) {
+            soma += parseInt(base.charAt(i)) * (peso - i);
+        }
+        let resto = (soma * 10) % 11;
+        return (resto === 10 || resto === 11) ? 0 : resto;
+    };
+
+    const digito1 = calcDigito(cpf.substring(0, 9), 10);
+    const digito2 = calcDigito(cpf.substring(0, 9) + digito1, 11);
+
+    return cpf.endsWith(`${digito1}${digito2}`);
+}
+
+function gerarTabela() {
+    const inputText = document.getElementById("input-lista").value;
+    const linhas = inputText.split("\n").map(l => l.trim()).filter(l => l !== "");
+
+    const listaFormatada = [];
+    const nomesSemCPF = [];
+    const tabela = document.getElementById("tabela-gerada");
+    tabela.innerHTML = ""; // Limpa a tabela existente
+
+    // Regex para CPF, agora mais flexível para 'O' ou '0' e diversos separadores
+    // Busca 11 caracteres que sejam 0-9 ou O/o
+    const regexCPF = /[Oo0-9]{2,3}[^\w\d]*[Oo0-9]{2,3}[^\w\d]*[Oo0-9]{2,3}[^\w\d]*[Oo0-9]{2}/;
+    const regexNome = /^(?:[0-9]{1,2}\s*-\s*)?([A-ZÀ-Ýa-zà-ÿ'´`]+\s+[A-ZÀ-Ýa-zà-ÿ'´`]+(?:(?:\s+|,\s*)[A-ZÀ-Ýa-zà-ÿ'´`]+)*)/;
+
+    let nomeEncontrado = "";
+    let cpfEncontrado = "";
+    let emailEncontrado = "-";
+
+    // Vamos iterar linha por linha para identificar o que é o quê
+    linhas.forEach(linha => {
+        // Ignorar linhas que contêm a frase de horário
+        if (linha.toUpperCase().includes("6:00 H ATE 21:00 H")) {
+            return; // Pula esta linha
+        }
+
+        // Tentar encontrar CPF na linha atual
+        const cpfsMatch = linha.match(regexCPF);
+        if (cpfsMatch) {
+            // Substitui 'O'/'o' por '0' e remove caracteres não numéricos
+            cpfEncontrado = cpfsMatch[0].replace(/[Oo]/g, '0').replace(/\D/g, '');
+        }
+
+        // Tentar encontrar nome na linha atual
+        const nomesMatch = linha.match(regexNome);
+        if (nomesMatch && nomesMatch[1]) {
+            nomeEncontrado = capitalizarNome(nomesMatch[1].trim());
+        }
+
+        // Se encontrarmos um nome E um CPF na mesma iteração, ou se é a última linha de um bloco lógico
+        // Consideraremos um "bloco" como nome seguido de cpf (e o horário que ignoramos)
+        // Se encontramos um nome e um CPF, ou se encontramos um CPF e já temos um nome, então processamos
+        if (nomeEncontrado && cpfEncontrado) {
+            adicionarNaTabela(nomeEncontrado, cpfEncontrado, emailEncontrado);
+
+            if (validarCPF(cpfEncontrado)) {
+                listaFormatada.push(`[NOME]: ${nomeEncontrado} [CPF]: ${cpfEncontrado}`);
+            } else {
+                nomesSemCPF.push(`${nomeEncontrado} (CPF Inválido: ${cpfEncontrado})`);
+            }
+
+            // Resetar para o próximo bloco
+            nomeEncontrado = "";
+            cpfEncontrado = "";
+            emailEncontrado = "-";
+        }
+    });
+
+    // Adiciona quaisquer nomes que restaram sem CPF (ex: últimas linhas que só tem nome)
+    // Isso é um fallback caso o CPF não seja encontrado na linha imediatamente após o nome.
+    // É uma heurística, mas pode ajudar a capturar mais dados.
+    if (nomeEncontrado && !cpfEncontrado) {
+        nomesSemCPF.push(nomeEncontrado);
+    }
+
+
+    document.getElementById("output-lista").textContent = listaFormatada.join("\n");
+    updateNomeCount(); // Atualiza a contagem após gerar a tabela
+
+    // Exibe os nomes sem CPF em um alerta
+    if (nomesSemCPF.length > 0) {
+        alert("Os seguintes nomes não contêm CPF válido ou detectável (ou foram ignorados):\n" + nomesSemCPF.join("\n"));
+    }
+}
+
+
+function capitalizarNome(nome) {
+    return nome.split(" ").map(p => {
+        const lower = p.toLowerCase();
+        if (['da', 'de', 'do', 'dos', 'das', 'e', 'santo', 'santa'].includes(lower)) { // Adicionado 'e', 'santo', 'santa'
+            return lower;
+        }
+        return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+    }).join(" ");
+}
+
+function adicionarNaTabela(nome, cpf, email) {
+    let tabela = document.getElementById("tabela-gerada");
+    const cpfValido = validarCPF(cpf);
+    // Adiciona uma classe para CPF inválido, para poder estilizá-lo com CSS
+    const classeCPF = cpfValido ? "" : "cpf-invalido";
+    const titleCPF = cpfValido ? "" : "title='CPF inválido!'";
+
+    let novaLinha = `
+        <tr>
+            <td><input type="checkbox"></td>
+            <td><button onclick="copiarTexto('${nome}')">${nome || '-'}</button></td>
+            <td class="${classeCPF}" ${titleCPF}><button onclick="copiarTexto('${cpf}')">${cpf || '-'}</button></td>
+            <td><button onclick="copiarTexto('${email}')">${email || '-'}</button></td>
+        </tr>
+    `;
+    tabela.innerHTML += novaLinha;
+}
+
+function filtrarTabela() {
+    const termo = document.getElementById("pesquisa").value.toLowerCase();
+    const linhas = document.getElementById("tabela-gerada").getElementsByTagName("tr");
+
+    for (let i = 0; i < linhas.length; i++) {
+        const nome = linhas[i].getElementsByTagName("td")[1];
+        if (nome) {
+            const textoNome = nome.textContent.toLowerCase();
+            linhas[i].style.display = textoNome.includes(termo) ? "" : "none";
+        }
+    }
+}
+
+function copiarLista() {
+    let texto = document.getElementById("output-lista").textContent;
+    copiarTexto(texto);
+    showNotification("Lista copiada!", false);
+}
+
+function gerarEmail() {
+    const horario = document.getElementById("horario").value;
+    const nomesInput = document.getElementById("nomes").value;
+    const nomes = nomesInput.split(',').map(nome => nome.trim()).join('\n');
+
+    const emailText = `Prezados,
+
+${horario},
+
+Estou passando para informar que todas as pessoas mencionados na lista estão cadastrados.
+Caso a foto dos colaboradores não seja aceita, é necessário que se dirijam ao setor fiscal da unidade para fazer a correção.
+
+Atenciosamente,
+
+${nomes}`;
+
+    document.getElementById("email-gerado").textContent = emailText.trim();
+    showNotification("E-mail gerado!", false);
+}
+
+function copiarTexto(texto) {
+    const tempInput = document.createElement("textarea");
+    tempInput.value = texto;
+    tempInput.style.position = "absolute";
+    tempInput.style.left = "-9999px";
+    document.body.appendChild(tempInput);
+
+    tempInput.select();
+    try {
+        document.execCommand("copy");
+        showNotification("Copiado com sucesso!", false);
+    } catch (err) {
+        console.error("Erro ao copiar texto:", err);
+        showNotification("Erro ao copiar texto.", true);
+    } finally {
+        document.body.removeChild(tempInput);
+    }
+}
+
+function copiarEmail() {
+    const emailText = document.getElementById("email-gerado").textContent;
+    copiarTexto(emailText);
+}
+
+function showNotification(message, isError) {
+    const notification = document.getElementById("copy-notification");
+    notification.textContent = message;
+    notification.style.backgroundColor = isError ? "#f44336" : "#4CAF50";
+    notification.classList.add("show");
+    setTimeout(() => {
+        notification.classList.remove("show");
+    }, 3000);
+}
+
+// --- INTEGRAÇÃO COM OCR.space ---
+async function enviarImagemOCR() {
+    const inputFile = document.getElementById("imagem-upload");
+    if (inputFile.files.length === 0) {
+        showNotification("Por favor, selecione uma imagem para enviar.", true);
+        return;
+    }
+
+    let arquivo = inputFile.files[0];
+    const ocrSpinner = document.getElementById('ocr-spinner');
+    const extractButton = document.querySelector('button[onclick="enviarImagemOCR()"]');
+
+    extractButton.disabled = true;
+    ocrSpinner.style.display = 'inline-block';
+    showNotification("Enviando imagem para OCR...", false);
+
+    // Verifica o tamanho do arquivo e redimensiona se for maior que 1MB
+    if (arquivo.size > 1024 * 1024) { // 1MB em bytes
+        showNotification("Redimensionando imagem para envio...", false);
+        // Redimensiona para uma largura/altura máxima de 1200px com qualidade 0.8
+        arquivo = await resizeImage(arquivo, 1200, 1200, 0.8);
+        if (!arquivo) {
+            showNotification("Falha ao redimensionar a imagem.", true);
+            extractButton.disabled = false;
+            ocrSpinner.style.display = 'none';
+            return;
+        }
+    }
+
+    const formData = new FormData();
+    formData.append("apikey", "K89510033988957");
+    formData.append("language", "por");
+    formData.append("file", arquivo, "uploaded_image.jpg"); // Adicione o nome do arquivo com a extensão
+    formData.append("OCREngine", "2");
+
+    try {
+        const resposta = await fetch("https://api.ocr.space/parse/image", {
+            method: "POST",
+            body: formData,
+        });
+        const dados = await resposta.json();
+
+        if (dados.IsErroredOnProcessing || !dados.ParsedResults || dados.ParsedResults.length === 0) {
+            const errorMessage = dados.ErrorMessage ? dados.ErrorMessage.join(". ") : "Ocorreu um erro desconhecido no OCR.";
+            showNotification("Erro ao processar a imagem: " + errorMessage, true);
+            return;
+        }
+
+        const textoExtraido = dados.ParsedResults[0].ParsedText;
+        // APENAS EXIBE NO NOVO LOCAL, NÃO PREENCHE MAIS O TEXTAREA DIRETAMENTE AQUI
+        document.getElementById("display-ocr-text").textContent = textoExtraido;
+        document.getElementById("ocr-display-area").style.display = 'block'; // Mostra a área de exibição
+        showNotification("Texto extraído com sucesso!", false);
+
+    } catch (erro) {
+        console.error("Falha na requisição OCR:", erro);
+        showNotification("Falha na requisição OCR: " + erro.message, true);
+    } finally {
+        extractButton.disabled = false;
+        ocrSpinner.style.display = 'none';
+    }
+}
+
+// --- EVENTOS DA TABELA ---
+document.getElementById("tabela-gerada").addEventListener("change", function(e) {
+    if (e.target.type === "checkbox") {
+        const linha = e.target.closest("tr");
+        if (!linha) return;
+
+        const estaMarcado = e.target.checked;
+
+        linha.querySelectorAll("td button").forEach(botao => {
+            if (estaMarcado) {
+                botao.classList.add("riscado", "desativado");
+            } else {
+                botao.classList.remove("riscado", "desativado");
+            }
+        });
+
+        linha.querySelectorAll("td").forEach(td => {
+            if (estaMarcado) {
+                td.classList.add("riscado");
+            } else {
+                td.classList.remove("riscado");
+            }
+        });
+
+        if (estaMarcado) {
+            const tbody = linha.parentElement;
+            tbody.appendChild(linha);
+
+            linha.classList.add("pular");
+            linha.addEventListener('animationend', () => {
+                linha.classList.remove("pular");
+            }, { once: true });
+        }
+        updateNomeCount();
+    }
+});
+
+// Lógica para alternar o modo noturno e carregar preferência
+document.getElementById('dark-mode-toggle').addEventListener('click', function() {
+    document.body.classList.toggle('dark-mode');
+    if (document.body.classList.contains('dark-mode')) {
+        localStorage.setItem('darkMode', 'enabled');
+        this.textContent = '☀️';
+    } else {
+        localStorage.setItem('darkMode', 'disabled');
+        this.textContent = '🌙';
+    }
+});
+
+// Verifica a preferência do usuário ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    if (localStorage.getItem('darkMode') === 'enabled') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('dark-mode-toggle').textContent = '☀️';
+    } else {
+        document.getElementById('dark-mode-toggle').textContent = '🌙';
+    }
+    updateNomeCount();
+    // Esconde a área de exibição do OCR no carregamento inicial
+    document.getElementById("ocr-display-area").style.display = 'none';
+});
