@@ -375,8 +375,8 @@ function gerarEmail() {
 
 ${horario},
 
-Estou passando para informar que todas as pessoas mencionados na lista estão cadastrados.
-Caso a foto dos colaboradores não seja aceita, é necessário que se dirijam ao setor fiscal da unidade para fazer a correção.
+Estou passando para informar que todas as pessoas mencionadas na lista estão cadastradas.
+Caso a foto ou o QR Code não funcione, entre em contato com o CCOS para que a correção seja feita.
 
 Atenciosamente,
 
