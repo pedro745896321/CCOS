@@ -1,6 +1,7 @@
 // Variáveis globais para a câmera
 let currentStream;
-let photoTakenBlob; // Para armazenar o blob da imagem capturada
+let rotationAngle = 0; // Variável para o ângulo de rotação em graus (0, 90, 180, 270)
+let originalPhotoDataURL; // Armazena a imagem original do vídeo como Data URL para rotações
 
 // --- FUNÇÕES DA CÂMERA ---
 function openCameraModal() {
@@ -19,8 +20,9 @@ async function startCamera() {
     const takePhotoButton = document.getElementById('take-photo-button');
     const retryPhotoButton = document.getElementById('retry-photo-button');
     const usePhotoButton = document.getElementById('use-photo-button');
-    const photoCanvas = document.getElementById('photo-canvas');
-    const context = photoCanvas.getContext('2d');
+    const rotateLeftButton = document.getElementById('rotate-left-button');
+    const rotateRightButton = document.getElementById('rotate-right-button');
+    const downloadPhotoButton = document.getElementById('download-photo-button');
 
     try {
         // Solicita acesso à câmera
@@ -31,12 +33,17 @@ async function startCamera() {
         takePhotoButton.style.display = 'inline-block';
         retryPhotoButton.style.display = 'none';
         usePhotoButton.style.display = 'none';
+        rotateLeftButton.style.display = 'none';
+        rotateRightButton.style.display = 'none';
+        downloadPhotoButton.style.display = 'none';
         video.style.display = 'block';
-        photoCanvas.style.display = 'none';
+        document.getElementById('photo-canvas').style.display = 'none'; // Garante que o canvas esteja escondido
+        rotationAngle = 0; // Reseta o ângulo ao iniciar a câmera
+        originalPhotoDataURL = null; // Reseta a imagem original
 
     } catch (err) {
         console.error("Erro ao acessar a câmera: ", err);
-        alert("Não foi possível acessar a câmera. Verifique as permissões ou se há outra aplicação usando-a.");
+        showNotification("Não foi possível acessar a câmera. Verifique as permissões ou se há outra aplicação usando-a.", true);
         closeCameraModal();
     }
 }
@@ -52,12 +59,13 @@ function takePhoto() {
     const photoCanvas = document.getElementById('photo-canvas');
     const context = photoCanvas.getContext('2d');
 
-    // Define o tamanho do canvas para o tamanho do vídeo
     photoCanvas.width = video.videoWidth;
     photoCanvas.height = video.videoHeight;
 
-    // Desenha o frame atual do vídeo no canvas
     context.drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
+
+    // Armazena a imagem capturada como Data URL para rotações futuras
+    originalPhotoDataURL = photoCanvas.toDataURL('image/jpeg', 0.95);
 
     // Esconde o vídeo e mostra a imagem capturada no canvas
     video.style.display = 'none';
@@ -67,24 +75,19 @@ function takePhoto() {
     document.getElementById('take-photo-button').style.display = 'none';
     document.getElementById('retry-photo-button').style.display = 'inline-block';
     document.getElementById('use-photo-button').style.display = 'inline-block';
+    document.getElementById('rotate-left-button').style.display = 'inline-block';
+    document.getElementById('rotate-right-button').style.display = 'inline-block';
+    document.getElementById('download-photo-button').style.display = 'inline-block';
 
-    // Armazena a imagem como Blob para enviar ao OCR
-    photoCanvas.toBlob((blob) => {
-        photoTakenBlob = blob;
-    }, 'image/jpeg', 0.95); // Qualidade da imagem
+    rotationAngle = 0; // Reseta o ângulo ao tirar a foto
 }
 
 function retryPhoto() {
-    startCamera(); // Reinicia a câmera
-    document.getElementById('photo-canvas').style.display = 'none';
-    document.getElementById('camera-feed').style.display = 'block';
-    document.getElementById('take-photo-button').style.display = 'inline-block';
-    document.getElementById('retry-photo-button').style.display = 'none';
-    document.getElementById('use-photo-button').style.display = 'none';
-    photoTakenBlob = null; // Limpa o blob da foto
+    startCamera(); // Reinicia a câmera e o estado dos botões
+    resetCameraControls(); // Chama para garantir que tudo esteja no estado inicial
 }
 
-// Nova função para redimensionar a imagem
+// Função para redimensionar a imagem
 async function resizeImage(fileBlob, maxWidth = 1200, maxHeight = 1200, quality = 0.8) {
     return new Promise((resolve) => {
         const img = new Image();
@@ -97,7 +100,6 @@ async function resizeImage(fileBlob, maxWidth = 1200, maxHeight = 1200, quality 
                 let width = img.width;
                 let height = img.height;
 
-                // Calculate new dimensions
                 if (width > height) {
                     if (width > maxWidth) {
                         height *= maxWidth / width;
@@ -125,9 +127,86 @@ async function resizeImage(fileBlob, maxWidth = 1200, maxHeight = 1200, quality 
     });
 }
 
+// Função para desenhar a imagem no canvas com rotação
+async function drawRotatedImage() {
+    if (!originalPhotoDataURL) return; // Usa originalPhotoDataURL para redesenhar
+
+    const img = new Image();
+    img.src = originalPhotoDataURL;
+
+    img.onload = () => {
+        const photoCanvas = document.getElementById('photo-canvas');
+        const context = photoCanvas.getContext('2d');
+
+        // Determina as novas dimensões do canvas após a rotação
+        let newWidth = img.width;
+        let newHeight = img.height;
+        if (rotationAngle === 90 || rotationAngle === 270) {
+            newWidth = img.height;
+            newHeight = img.width;
+        }
+
+        photoCanvas.width = newWidth;
+        photoCanvas.height = newHeight;
+
+        context.clearRect(0, 0, photoCanvas.width, photoCanvas.height); // Limpa o canvas
+
+        context.save(); // Salva o estado atual do canvas
+
+        // Move o ponto de origem para o centro do novo canvas
+        context.translate(photoCanvas.width / 2, photoCanvas.height / 2);
+
+        // Rotaciona
+        context.rotate(rotationAngle * Math.PI / 180);
+
+        // Desenha a imagem original centrada (usando as dimensões originais da imagem)
+        context.drawImage(img, -img.width / 2, -img.height / 2, img.width, img.height);
+
+        context.restore(); // Restaura o estado anterior do canvas
+    };
+}
+
+// Funções para girar a imagem
+function rotateLeft() {
+    rotationAngle = (rotationAngle - 90 + 360) % 360; // Garante que o ângulo fique entre 0 e 270
+    drawRotatedImage();
+}
+
+function rotateRight() {
+    rotationAngle = (rotationAngle + 90) % 360;
+    drawRotatedImage();
+}
+
+// Função para iniciar o download da foto
+function downloadPhoto() {
+    const photoCanvas = document.getElementById('photo-canvas');
+    if (photoCanvas.style.display === 'none' || !originalPhotoDataURL) { // Verifica se há uma imagem no canvas
+        showNotification("Não há foto para baixar.", true);
+        return;
+    }
+
+    photoCanvas.toBlob((blob) => {
+        if (!blob) {
+            showNotification("Falha ao gerar a imagem para download.", true);
+            return;
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'foto_capturada.jpg'; // Nome do arquivo a ser baixado
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url); // Libera o URL do objeto
+        showNotification("Foto baixada!", false);
+    }, 'image/jpeg', 0.95);
+}
+
+
 async function usePhoto() {
-    if (!photoTakenBlob) {
-        alert("Nenhuma foto foi capturada.");
+    const photoCanvas = document.getElementById('photo-canvas');
+    if (photoCanvas.style.display === 'none' || !originalPhotoDataURL) { // Verifica se há uma imagem no canvas
+        showNotification("Nenhuma foto foi capturada ou processada no canvas.", true);
         return;
     }
 
@@ -139,67 +218,85 @@ async function usePhoto() {
     ocrSpinner.style.display = 'inline-block';
     showNotification("Enviando foto para OCR...", false);
 
-    let imageToSend = photoTakenBlob;
-
-    // Verifica o tamanho do arquivo e redimensiona se for maior que 1MB
-    if (photoTakenBlob.size > 1024 * 1024) { // 1MB em bytes
-        showNotification("Redimensionando imagem para envio...", false);
-        // Redimensiona para uma largura/altura máxima de 1200px com qualidade 0.8
-        imageToSend = await resizeImage(photoTakenBlob, 1200, 1200, 0.8);
-        if (!imageToSend) {
-            showNotification("Falha ao redimensionar a imagem.", true);
+    // Gerar o blob da imagem atualmente no canvas (com rotação aplicada)
+    photoCanvas.toBlob(async (blob) => {
+        if (!blob) {
+            showNotification("Falha ao gerar a imagem para envio.", true);
             extractButton.disabled = false;
             ocrSpinner.style.display = 'none';
             return;
         }
-    }
 
-    const formData = new FormData();
-    formData.append("apikey", "K89510033988957");
-    formData.append("language", "por");
-    formData.append("file", imageToSend, "camera_photo.jpg"); // Envia o blob (redimensionado ou original)
-    formData.append("OCREngine", "2");
+        let imageToSend = blob;
 
-    try {
-        const resposta = await fetch("https://api.ocr.space/parse/image", {
-            method: "POST",
-            body: formData,
-        });
-        const dados = await resposta.json();
-
-        if (dados.IsErroredOnProcessing || !dados.ParsedResults || dados.ParsedResults.length === 0) {
-            const errorMessage = dados.ErrorMessage ? dados.ErrorMessage.join(". ") : "Ocorreu um erro desconhecido no OCR.";
-            showNotification("Erro ao processar a imagem: " + errorMessage, true);
-            return;
+        // Verifica o tamanho do arquivo e redimensiona se for maior que 1MB
+        if (blob.size > 1024 * 1024) { // 1MB em bytes
+            showNotification("Redimensionando imagem para envio...", false);
+            imageToSend = await resizeImage(blob, 1200, 1200, 0.8);
+            if (!imageToSend) {
+                showNotification("Falha ao redimensionar a imagem.", true);
+                extractButton.disabled = false;
+                ocrSpinner.style.display = 'none';
+                return;
+            }
         }
 
-        const textoExtraido = dados.ParsedResults[0].ParsedText;
-        // APENAS EXIBE NO NOVO LOCAL, NÃO PREENCHE MAIS O TEXTAREA DIRETAMENTE AQUI
-        document.getElementById("display-ocr-text").textContent = textoExtraido; 
-        document.getElementById("ocr-display-area").style.display = 'block'; // Mostra a área de exibição
-        showNotification("Texto extraído com sucesso!", false);
+        const formData = new FormData();
+        formData.append("apikey", "K89510033988957");
+        formData.append("language", "por");
+        formData.append("file", imageToSend, "camera_photo.jpg");
+        formData.append("OCREngine", "2");
 
-    } catch (erro) {
-        console.error("Falha na requisição OCR:", erro);
-        showNotification("Falha na requisição OCR: " + erro.message, true);
-    } finally {
-        extractButton.disabled = false;
-        ocrSpinner.style.display = 'none';
-    }
+        try {
+            const resposta = await fetch("https://api.ocr.space/parse/image", {
+                method: "POST",
+                body: formData,
+            });
+            const dados = await resposta.json();
+
+            if (dados.IsErroredOnProcessing || !dados.ParsedResults || dados.ParsedResults.length === 0) {
+                const errorMessage = dados.ErrorMessage ? dados.ErrorMessage.join(". ") : "Ocorreu um erro desconhecido no OCR.";
+                showNotification("Erro ao processar a imagem: " + errorMessage, true);
+                return;
+            }
+
+            const textoExtraido = dados.ParsedResults[0].ParsedText;
+            document.getElementById("display-ocr-text").textContent = textoExtraido;
+            document.getElementById("ocr-display-area").style.display = 'block';
+            showNotification("Texto extraído com sucesso!", false);
+
+        } catch (erro) {
+            console.error("Falha na requisição OCR:", erro);
+            showNotification("Falha na requisição OCR: " + erro.message, true);
+        } finally {
+            extractButton.disabled = false;
+            ocrSpinner.style.display = 'none';
+        }
+    }, 'image/jpeg', 0.95);
 }
 
+// Reseta o estado dos controles da câmera e variáveis de rotação
 function resetCameraControls() {
     document.getElementById('take-photo-button').style.display = 'inline-block';
     document.getElementById('retry-photo-button').style.display = 'none';
     document.getElementById('use-photo-button').style.display = 'none';
+    document.getElementById('rotate-left-button').style.display = 'none';
+    document.getElementById('rotate-right-button').style.display = 'none';
+    document.getElementById('download-photo-button').style.display = 'none';
     document.getElementById('camera-feed').style.display = 'block';
     document.getElementById('photo-canvas').style.display = 'none';
-    photoTakenBlob = null;
+    rotationAngle = 0; // Reseta o ângulo
+    originalPhotoDataURL = null; // Adicionado para resetar a imagem original
 }
 
+// Adicione os event listeners para os botões da câmera e de rotação
 document.getElementById('take-photo-button').addEventListener('click', takePhoto);
 document.getElementById('retry-photo-button').addEventListener('click', retryPhoto);
 document.getElementById('use-photo-button').addEventListener('click', usePhoto);
+document.getElementById('rotate-left-button').addEventListener('click', rotateLeft);
+document.getElementById('rotate-right-button').addEventListener('click', rotateRight);
+document.getElementById('download-photo-button').addEventListener('click', downloadPhoto);
+
 
 // NOVA FUNÇÃO: Transferir texto do OCR para o textarea de input
 function transferirParaInput() {
@@ -214,7 +311,7 @@ function transferirParaInput() {
 }
 
 
-// --- FUNÇÕES DE LÓGICA E MANIPULAÇÃO DA TABELA (Originais mantidas e aprimoradas) ---
+// --- FUNÇÕES DE LÓGICA E MANIPULAÇÃO DA TABELA ---
 
 function updateNomeCount() {
     const totalNomes = document.querySelectorAll("#tabela-gerada tr").length;
@@ -253,66 +350,81 @@ function gerarTabela() {
     const tabela = document.getElementById("tabela-gerada");
     tabela.innerHTML = ""; // Limpa a tabela existente
 
-    // Regex para CPF, agora mais flexível para 'O' ou '0' e diversos separadores
-    // Busca 11 caracteres que sejam 0-9 ou O/o
+    // Regex para CPF, mais flexível para 'O' ou '0' e diversos separadores
     const regexCPF = /[Oo0-9]{2,3}[^\w\d]*[Oo0-9]{2,3}[^\w\d]*[Oo0-9]{2,3}[^\w\d]*[Oo0-9]{2}/;
-    const regexNome = /^(?:[0-9]{1,2}\s*-\s*)?([A-ZÀ-Ýa-zà-ÿ'´`]+\s+[A-ZÀ-Ýa-zà-ÿ'´`]+(?:(?:\s+|,\s*)[A-ZÀ-Ýa-zà-ÿ'´`]+)*)/;
+    // Regex para nomes: tenta capturar nomes que possam ter números de linha na frente (ex: "1 - NOME SOBRENOME")
+    const regexNome = /^(?:[0-9]{1,3}\s*[-–—]?\s*)?([A-ZÀ-Ýa-zà-ÿ'\´`\s]+(?:da|de|do|dos|das|e|santo|santa)?(?:\s+[A-ZÀ-Ýa-zà-ÿ'\´`\s]+)*)/;
+    const regexEmail = /[\w.-]+@[\w.-]+\.\w+/; // Regex para e-mail
 
-    let nomeEncontrado = "";
-    let cpfEncontrado = "";
-    let emailEncontrado = "-";
+    let currentName = null;
+    let currentCPF = null;
+    let currentEmail = null;
 
-    // Vamos iterar linha por linha para identificar o que é o quê
     linhas.forEach(linha => {
         // Ignorar linhas que contêm a frase de horário
         if (linha.toUpperCase().includes("6:00 H ATE 21:00 H")) {
-            return; // Pula esta linha
+            return;
         }
 
-        // Tentar encontrar CPF na linha atual
-        const cpfsMatch = linha.match(regexCPF);
-        if (cpfsMatch) {
-            // Substitui 'O'/'o' por '0' e remove caracteres não numéricos
-            cpfEncontrado = cpfsMatch[0].replace(/[Oo]/g, '0').replace(/\D/g, '');
-        }
+        const cpfMatch = linha.match(regexCPF);
+        const nameMatch = linha.match(regexNome);
+        const emailMatch = linha.match(regexEmail);
 
-        // Tentar encontrar nome na linha atual
-        const nomesMatch = linha.match(regexNome);
-        if (nomesMatch && nomesMatch[1]) {
-            nomeEncontrado = capitalizarNome(nomesMatch[1].trim());
-        }
-
-        // Se encontrarmos um nome E um CPF na mesma iteração, ou se é a última linha de um bloco lógico
-        // Consideraremos um "bloco" como nome seguido de cpf (e o horário que ignoramos)
-        // Se encontramos um nome e um CPF, ou se encontramos um CPF e já temos um nome, então processamos
-        if (nomeEncontrado && cpfEncontrado) {
-            adicionarNaTabela(nomeEncontrado, cpfEncontrado, emailEncontrado);
-
-            if (validarCPF(cpfEncontrado)) {
-                listaFormatada.push(`[NOME]: ${nomeEncontrado} [CPF]: ${cpfEncontrado}`);
-            } else {
-                nomesSemCPF.push(`${nomeEncontrado} (CPF Inválido: ${cpfEncontrado})`);
+        if (nameMatch && nameMatch[1]) {
+            // Se um novo nome é encontrado, e já temos um nome e CPF pendentes, processamos o anterior
+            if (currentName && currentCPF) {
+                adicionarRegistro(currentName, currentCPF, currentEmail);
             }
+            currentName = capitalizarNome(nameMatch[1].trim());
+            currentCPF = null; // Reseta CPF e Email para o novo nome
+            currentEmail = null;
+        }
 
-            // Resetar para o próximo bloco
-            nomeEncontrado = "";
-            cpfEncontrado = "";
-            emailEncontrado = "-";
+        if (cpfMatch) {
+            currentCPF = cpfMatch[0].replace(/[Oo]/g, '0').replace(/\D/g, '');
+        }
+
+        if (emailMatch) {
+            currentEmail = emailMatch[0].toLowerCase();
+        }
+
+        // Se temos um nome e agora um CPF, adicionamos (ou se o email foi encontrado)
+        if (currentName && currentCPF) {
+            adicionarRegistro(currentName, currentCPF, currentEmail);
+            currentName = null;
+            currentCPF = null;
+            currentEmail = null;
+        } else if (currentName && currentEmail && !currentCPF) {
+            // Caso raro: tem nome e email mas não CPF. Pode ser um registro incompleto.
+            // Por enquanto, vou esperar pelo CPF.
         }
     });
 
-    // Adiciona quaisquer nomes que restaram sem CPF (ex: últimas linhas que só tem nome)
-    // Isso é um fallback caso o CPF não seja encontrado na linha imediatamente após o nome.
-    // É uma heurística, mas pode ajudar a capturar mais dados.
-    if (nomeEncontrado && !cpfEncontrado) {
-        nomesSemCPF.push(nomeEncontrado);
+    // Adiciona o último registro se houver dados pendentes
+    if (currentName && (currentCPF || currentEmail)) {
+        adicionarRegistro(currentName, currentCPF, currentEmail);
+    } else if (currentName && !currentCPF && !currentEmail) {
+        // Se restou apenas um nome sem CPF/Email detectável
+        nomesSemCPF.push(currentName);
     }
 
 
-    document.getElementById("output-lista").textContent = listaFormatada.join("\n");
-    updateNomeCount(); // Atualiza a contagem após gerar a tabela
+    function adicionarRegistro(nome, cpf, email) {
+        const cpfFinal = cpf || '-'; // Garante que não é null
+        const emailFinal = email || '-'; // Garante que não é null
 
-    // Exibe os nomes sem CPF em um alerta
+        adicionarNaTabela(nome, cpfFinal, emailFinal);
+
+        if (validarCPF(cpfFinal)) {
+            listaFormatada.push(`[NOME]: ${nome} [CPF]: ${cpfFinal}`);
+        } else {
+            nomesSemCPF.push(`${nome} (CPF Inválido: ${cpfFinal})`);
+        }
+    }
+
+    document.getElementById("output-lista").textContent = listaFormatada.join("\n");
+    updateNomeCount();
+
     if (nomesSemCPF.length > 0) {
         alert("Os seguintes nomes não contêm CPF válido ou detectável (ou foram ignorados):\n" + nomesSemCPF.join("\n"));
     }
@@ -322,7 +434,8 @@ function gerarTabela() {
 function capitalizarNome(nome) {
     return nome.split(" ").map(p => {
         const lower = p.toLowerCase();
-        if (['da', 'de', 'do', 'dos', 'das', 'e', 'santo', 'santa'].includes(lower)) { // Adicionado 'e', 'santo', 'santa'
+        // Removido 'santo', 'santa' da lista de exceções para capitalização
+        if (['da', 'de', 'do', 'dos', 'das', 'e'].includes(lower)) {
             return lower;
         }
         return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
@@ -375,8 +488,8 @@ function gerarEmail() {
 
 ${horario},
 
-Estou passando para informar que todas as pessoas mencionadas na lista estão cadastradas.
-Caso a foto ou o QR Code não funcione, entre em contato com o CCOS para que a correção seja feita.
+Estou passando para informar que todas as pessoas mencionados na lista estão cadastradas.
+Caso a foto ou Qr code da pessoa não funcione, é necessário entrar em contato com o CCOS para fazer a correção.
 
 Atenciosamente,
 
@@ -423,64 +536,77 @@ function showNotification(message, isError) {
 // --- INTEGRAÇÃO COM OCR.space ---
 async function enviarImagemOCR() {
     const inputFile = document.getElementById("imagem-upload");
-    if (inputFile.files.length === 0) {
-        showNotification("Por favor, selecione uma imagem para enviar.", true);
+    const files = inputFile.files; // Obtenha todos os arquivos selecionados
+
+    if (files.length === 0) {
+        showNotification("Por favor, selecione uma ou mais imagens para enviar.", true);
         return;
     }
 
-    let arquivo = inputFile.files[0];
     const ocrSpinner = document.getElementById('ocr-spinner');
     const extractButton = document.querySelector('button[onclick="enviarImagemOCR()"]');
 
     extractButton.disabled = true;
     ocrSpinner.style.display = 'inline-block';
-    showNotification("Enviando imagem para OCR...", false);
+    document.getElementById("display-ocr-text").textContent = "Processando imagens..."; // Limpa a área de texto anterior
+    document.getElementById("ocr-display-area").style.display = 'block';
 
-    // Verifica o tamanho do arquivo e redimensiona se for maior que 1MB
-    if (arquivo.size > 1024 * 1024) { // 1MB em bytes
-        showNotification("Redimensionando imagem para envio...", false);
-        // Redimensiona para uma largura/altura máxima de 1200px com qualidade 0.8
-        arquivo = await resizeImage(arquivo, 1200, 1200, 0.8);
-        if (!arquivo) {
-            showNotification("Falha ao redimensionar a imagem.", true);
-            extractButton.disabled = false;
-            ocrSpinner.style.display = 'none';
-            return;
+    let allExtractedText = []; // Array para armazenar o texto de todas as imagens
+
+    for (let i = 0; i < files.length; i++) {
+        let arquivo = files[i];
+        showNotification(`Processando imagem ${i + 1} de ${files.length}...`, false);
+
+        if (arquivo.size === 0) { // Adicionado: tratamento para arquivos vazios
+            showNotification(`Imagem ${i + 1} (${arquivo.name}) está vazia e será ignorada.`, true);
+            allExtractedText.push(`--- IMAGEM ${i + 1} (${arquivo.name}) VAZIA ---`);
+            continue; // Pula esta imagem
+        }
+
+        // Verifica o tamanho do arquivo e redimensiona se for maior que 1MB
+        if (arquivo.size > 1024 * 1024) { // 1MB em bytes
+            showNotification(`Redimensionando imagem ${arquivo.name} para envio...`, false);
+            arquivo = await resizeImage(arquivo, 1200, 1200, 0.8);
+            if (!arquivo) {
+                showNotification(`Falha ao redimensionar a imagem ${arquivo.name}.`, true);
+                allExtractedText.push(`--- ERRO NA IMAGEM ${i + 1} (Falha ao redimensionar) ---`);
+                continue; // Pula para a próxima imagem
+            }
+        }
+
+        const formData = new FormData();
+        formData.append("apikey", "K89510033988957");
+        formData.append("language", "por");
+        formData.append("file", arquivo, `uploaded_image_${i}.jpg`); // Adicione um nome de arquivo único
+        formData.append("OCREngine", "2");
+
+        try {
+            const resposta = await fetch("https://api.ocr.space/parse/image", {
+                method: "POST",
+                body: formData,
+            });
+            const dados = await resposta.json();
+
+            if (dados.IsErroredOnProcessing || !dados.ParsedResults || dados.ParsedResults.length === 0) {
+                const errorMessage = dados.ErrorMessage ? dados.ErrorMessage.join(". ") : "Ocorreu um erro desconhecido no OCR.";
+                showNotification(`Erro ao processar a imagem ${arquivo.name}: ` + errorMessage, true);
+                allExtractedText.push(`--- ERRO NA IMAGEM ${i + 1} (${arquivo.name}) ---`);
+            } else {
+                const textoExtraido = dados.ParsedResults[0].ParsedText;
+                allExtractedText.push(`--- TEXTO DA IMAGEM ${i + 1} (${arquivo.name}) ---\n${textoExtraido.trim()}`);
+            }
+
+        } catch (erro) {
+            console.error(`Falha na requisição OCR para imagem ${arquivo.name}:`, erro);
+            showNotification(`Falha na requisição OCR para imagem ${arquivo.name}: ` + erro.message, true);
+            allExtractedText.push(`--- ERRO NA IMAGEM ${i + 1} (${arquivo.name}): ${erro.message} ---`);
         }
     }
 
-    const formData = new FormData();
-    formData.append("apikey", "K89510033988957");
-    formData.append("language", "por");
-    formData.append("file", arquivo, "uploaded_image.jpg"); // Adicione o nome do arquivo com a extensão
-    formData.append("OCREngine", "2");
-
-    try {
-        const resposta = await fetch("https://api.ocr.space/parse/image", {
-            method: "POST",
-            body: formData,
-        });
-        const dados = await resposta.json();
-
-        if (dados.IsErroredOnProcessing || !dados.ParsedResults || dados.ParsedResults.length === 0) {
-            const errorMessage = dados.ErrorMessage ? dados.ErrorMessage.join(". ") : "Ocorreu um erro desconhecido no OCR.";
-            showNotification("Erro ao processar a imagem: " + errorMessage, true);
-            return;
-        }
-
-        const textoExtraido = dados.ParsedResults[0].ParsedText;
-        // APENAS EXIBE NO NOVO LOCAL, NÃO PREENCHE MAIS O TEXTAREA DIRETAMENTE AQUI
-        document.getElementById("display-ocr-text").textContent = textoExtraido;
-        document.getElementById("ocr-display-area").style.display = 'block'; // Mostra a área de exibição
-        showNotification("Texto extraído com sucesso!", false);
-
-    } catch (erro) {
-        console.error("Falha na requisição OCR:", erro);
-        showNotification("Falha na requisição OCR: " + erro.message, true);
-    } finally {
-        extractButton.disabled = false;
-        ocrSpinner.style.display = 'none';
-    }
+    document.getElementById("display-ocr-text").textContent = allExtractedText.join("\n\n"); // Concatena todo o texto
+    showNotification("Processamento de todas as imagens concluído!", false);
+    extractButton.disabled = false;
+    ocrSpinner.style.display = 'none';
 }
 
 // --- EVENTOS DA TABELA ---
@@ -526,19 +652,24 @@ document.getElementById('dark-mode-toggle').addEventListener('click', function()
     if (document.body.classList.contains('dark-mode')) {
         localStorage.setItem('darkMode', 'enabled');
         this.textContent = '☀️';
+        this.setAttribute('aria-label', 'Alternar para modo claro');
     } else {
         localStorage.setItem('darkMode', 'disabled');
         this.textContent = '🌙';
+        this.setAttribute('aria-label', 'Alternar para modo escuro');
     }
 });
 
 // Verifica a preferência do usuário ao carregar a página
 document.addEventListener('DOMContentLoaded', function() {
+    const darkModeToggle = document.getElementById('dark-mode-toggle');
     if (localStorage.getItem('darkMode') === 'enabled') {
         document.body.classList.add('dark-mode');
-        document.getElementById('dark-mode-toggle').textContent = '☀️';
+        darkModeToggle.textContent = '☀️';
+        darkModeToggle.setAttribute('aria-label', 'Alternar para modo claro');
     } else {
-        document.getElementById('dark-mode-toggle').textContent = '🌙';
+        darkModeToggle.textContent = '🌙';
+        darkModeToggle.setAttribute('aria-label', 'Alternar para modo escuro');
     }
     updateNomeCount();
     // Esconde a área de exibição do OCR no carregamento inicial
