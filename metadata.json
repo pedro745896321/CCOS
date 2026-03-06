@@ -1,0 +1,7 @@
+{
+  "name": "Gestão de documentos",
+  "description": "Aplicativo para extração de texto de imagens (OCR), processamento de listas de nomes e CPFs, e geração de e-mails.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
